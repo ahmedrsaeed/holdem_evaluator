@@ -6,8 +6,27 @@ import (
 	"os"
 )
 
+type EvaluatedHand struct {
+	HandName string
+	HandRank uint32
+	Value    uint32
+}
+
 type HandEvaluator struct {
 	buffer []byte
+}
+
+var handTypes = []string{
+	"invalid hand",
+	"high card",
+	"one pair",
+	"two pairs",
+	"three of a kind",
+	"straight",
+	"flush",
+	"full house",
+	"four of a kind",
+	"straight flush",
 }
 
 func New() HandEvaluator {
@@ -42,7 +61,7 @@ func (e *HandEvaluator) intialize() {
 
 }
 
-func (e *HandEvaluator) Eval(hand []int) uint32 {
+func (e *HandEvaluator) Eval(hand []int) EvaluatedHand {
 	p := uint32(53)
 
 	for _, c := range hand {
@@ -50,5 +69,9 @@ func (e *HandEvaluator) Eval(hand []int) uint32 {
 		p = binary.LittleEndian.Uint32(e.buffer[start : start+4])
 	}
 
-	return p
+	return EvaluatedHand{
+		Value:    p,
+		HandRank: p & 0x00000fff,
+		HandName: handTypes[p>>12],
+	}
 }
