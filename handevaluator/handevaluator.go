@@ -2,7 +2,6 @@ package handevaluator
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os"
 )
 
@@ -29,36 +28,37 @@ var handTypes = []string{
 	"straight flush",
 }
 
-func New() HandEvaluator {
+func New() (HandEvaluator, error) {
 	h := HandEvaluator{}
-	h.intialize()
-	return h
+	err := h.intialize()
+
+	if err != nil {
+		return h, err
+	}
+	return h, nil
 }
 
-func (e *HandEvaluator) intialize() {
+func (e *HandEvaluator) intialize() error {
 	file, err := os.Open("HandRanks.dat")
 	if err != nil {
-		panic(err)
+		return err
 	}
+
 	defer file.Close()
 
 	fileinfo, err := file.Stat()
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	filesize := fileinfo.Size()
 	e.buffer = make([]byte, filesize)
 
-	bytesread, err := file.Read(e.buffer)
+	_, err = file.Read(e.buffer)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
-
-	fmt.Println("bytes read: ", bytesread)
-
+	return nil
 }
 
 func (e *HandEvaluator) Eval(hand []int) EvaluatedHand {
