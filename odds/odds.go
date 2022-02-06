@@ -8,6 +8,7 @@ import (
 	"holdem/handevaluator"
 	"holdem/list"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,9 @@ const (
 )
 
 type Odds struct {
+	WinP    float32
+	LoseP   float32
+	TieP    float32
 	Total   int
 	Invalid int
 	Win     int
@@ -47,51 +51,59 @@ func combinationsToCards(available []int, combinations [][]int) [][]int {
 	return out
 }
 
-func sample(combinations [][]int, desired int) [][]int {
+func getSampler(combinations [][]int) func(int) [][]int {
 
-	combinationsLength := len(combinations)
+	return func(desired int) [][]int {
 
-	if combinationsLength <= desired {
-		return combinations
+		combinationsLength := len(combinations)
+
+		if combinationsLength <= desired {
+			return combinations
+		}
+
+		sampleIndexes := make(map[int]struct{})
+		exists := struct{}{}
+		rGen := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		for len(sampleIndexes) < desired {
+			sampleIndexes[rGen.Intn(combinationsLength)] = exists
+		}
+
+		sampled := make([][]int, 0, len(sampleIndexes))
+
+		for selectedIndex := range sampleIndexes {
+			sampled = append(sampled, combinations[selectedIndex])
+		}
+
+		return sampled
 	}
-
-	sampleIndexes := make(map[int]struct{})
-	exists := struct{}{}
-	rGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	for len(sampleIndexes) < desired {
-		sampleIndexes[rGen.Intn(combinationsLength)] = exists
-	}
-
-	sampled := make([][]int, 0, len(sampleIndexes))
-
-	for selectedIndex := range sampleIndexes {
-		sampled = append(sampled, combinations[selectedIndex])
-	}
-
-	return sampled
 }
 
 func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations,
-	hero []int, community []int) (Odds, error) {
+	hero []int, community []int, sampleSize int) (Odds, error) {
 
-	result := Odds{
-		Hero:    map[string]int{},
-		Villain: map[string]int{},
+	handTypesMap := func() map[string]int {
+		htmap := map[string]int{}
+
+		for _, handType := range handevaluator.HandTypes() {
+			htmap[handType] = 0
+		}
+
+		return htmap
+	}
+
+	resultAccumulator := Odds{
+		Hero:    handTypesMap(),
+		Villain: handTypesMap(),
 	}
 
 	communityCount := len(community)
 	if len(hero) != 2 {
-		return result, errors.New("please provide 2 hole cards")
+		return resultAccumulator, errors.New("please provide 2 hole cards")
 	}
 
 	if communityCount == 1 || communityCount == 2 || communityCount > 5 {
-		return result, errors.New("please provide 3 or 4 or 5 community cards")
-	}
-
-	for _, handType := range handevaluator.HandTypes() {
-		result.Hero[handType] = 0
-		result.Villain[handType] = 0
+		return resultAccumulator, errors.New("please provide 3 or 4 or 5 community cards")
 	}
 
 	deck := deck.AllNumberValues()
@@ -103,7 +115,7 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 	villainCombinations, err := combinations.Get(availableToVillainCount, 2)
 
 	if err != nil {
-		return result, err
+		return resultAccumulator, err
 	}
 
 	villainHands := combinationsToCards(availableToVillain, villainCombinations)
@@ -111,44 +123,75 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 
 	communityCombinations, err := combinations.Get(availableToVillainCount-2, remainingCommunityCount)
 
+	sampleCommunityCombinations := getSampler(communityCombinations)
 	if err != nil {
-		return result, err
+		return resultAccumulator, err
 	}
 
+	results := make(chan Odds, len(villainHands))
+	var wg sync.WaitGroup
+
 	for vi, villain := range villainHands {
-
-		availableToCommunity := list.Filter(availableToVillain, func(av int) bool {
-			return !list.Includes(villain, av)
-		})
-
-		remainingCommunitiesSample := combinationsToCards(availableToCommunity, sample(communityCombinations, 5000))
-
-		fmt.Println(vi)
-		for _, remaining := range remainingCommunitiesSample {
-
-			allCommunity := append(community, remaining...)
-			heroResult := evaluator.Eval(append(allCommunity, hero...))
-
-			villainResult := evaluator.Eval(append(allCommunity, villain...))
-
-			switch {
-
-			case villainResult.HandName == handevaluator.InvalidHand:
-			case heroResult.HandName == handevaluator.InvalidHand:
-				result.Invalid++
-			case villainResult.Value < heroResult.Value:
-				result.Win++
-			case villainResult.Value > heroResult.Value:
-				result.Lose++
-			default:
-				result.Tie++
+		wg.Add(1)
+		go func(i int, govillain []int) {
+			defer wg.Done()
+			currentResult := Odds{
+				Hero:    handTypesMap(),
+				Villain: handTypesMap(),
 			}
-			result.Total++
-			result.Hero[heroResult.HandName]++
-			result.Villain[villainResult.HandName]++
+			availableToCommunity := list.Filter(availableToVillain, func(av int) bool {
+				return !list.Includes(govillain, av)
+			})
+
+			remainingCommunitiesSample := combinationsToCards(availableToCommunity, sampleCommunityCombinations(sampleSize))
+
+			for _, remaining := range remainingCommunitiesSample {
+
+				heroResult := evaluator.Eval(community, remaining, hero)
+				villainResult := evaluator.Eval(community, remaining, govillain)
+
+				switch {
+
+				case villainResult.HandName == handevaluator.InvalidHand:
+				case heroResult.HandName == handevaluator.InvalidHand:
+					currentResult.Invalid++
+				case villainResult.Value < heroResult.Value:
+					currentResult.Win++
+				case villainResult.Value > heroResult.Value:
+					currentResult.Lose++
+				default:
+					currentResult.Tie++
+				}
+				currentResult.Total++
+				currentResult.Hero[heroResult.HandName]++
+				currentResult.Villain[villainResult.HandName]++
+			}
+			results <- currentResult
+		}(vi, villain)
+	}
+
+	wg.Wait()
+	close(results)
+
+	for r := range results {
+
+		resultAccumulator.Total += r.Total
+		resultAccumulator.Invalid += r.Invalid
+		resultAccumulator.Win += r.Win
+		resultAccumulator.Lose += r.Lose
+		resultAccumulator.Tie += r.Tie
+
+		for _, handType := range handevaluator.HandTypes() {
+
+			resultAccumulator.Villain[handType] += r.Villain[handType]
+			resultAccumulator.Hero[handType] += r.Hero[handType]
 		}
 
 	}
 
-	return result, nil
+	resultAccumulator.WinP = float32(resultAccumulator.Win) / float32(resultAccumulator.Total)
+	resultAccumulator.LoseP = float32(resultAccumulator.Lose) / float32(resultAccumulator.Total)
+	resultAccumulator.TieP = float32(resultAccumulator.Tie) / float32(resultAccumulator.Total)
+	fmt.Println("Odds evaluated")
+	return resultAccumulator, nil
 }

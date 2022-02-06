@@ -7,32 +7,36 @@ import (
 
 type EvaluatedHand struct {
 	HandName string
-	HandRank uint32
-	Value    uint32
+	//HandRank uint32
+	Value uint32
 }
 
 type HandEvaluator struct {
-	buffer []byte
+	buffer    []byte
+	handTypes []string
 }
 
 const InvalidHand string = "invalid hand"
 
-var handTypes = []string{
-	InvalidHand,
-	"high card",
-	"one pair",
-	"two pairs",
-	"three of a kind",
-	"straight",
-	"flush",
-	"full house",
-	"four of a kind",
-	"straight flush",
+func HandTypes() []string {
+	return []string{
+		InvalidHand,
+		"high card",
+		"one pair",
+		"two pairs",
+		"three of a kind",
+		"straight",
+		"flush",
+		"full house",
+		"four of a kind",
+		"straight flush",
+	}
 }
 
 func New() (HandEvaluator, error) {
 	h := HandEvaluator{}
-	err := h.intialize()
+	h.handTypes = HandTypes()
+	err := h.intializeBuffer()
 
 	if err != nil {
 		return h, err
@@ -40,7 +44,7 @@ func New() (HandEvaluator, error) {
 	return h, nil
 }
 
-func (e *HandEvaluator) intialize() error {
+func (e *HandEvaluator) intializeBuffer() error {
 	file, err := os.Open("HandRanks.dat")
 	if err != nil {
 		return err
@@ -63,21 +67,19 @@ func (e *HandEvaluator) intialize() error {
 	return nil
 }
 
-func (e *HandEvaluator) Eval(hand []int) EvaluatedHand {
+func (e *HandEvaluator) Eval(hand ...[]int) EvaluatedHand {
 	p := uint32(53)
 
-	for _, c := range hand {
-		start := 4 * (p + uint32(c))
-		p = binary.LittleEndian.Uint32(e.buffer[start : start+4])
+	for _, subset := range hand {
+		for _, c := range subset {
+			start := 4 * (p + uint32(c))
+			p = binary.LittleEndian.Uint32(e.buffer[start : start+4])
+		}
 	}
 
 	return EvaluatedHand{
-		Value:    p,
-		HandRank: p & 0x00000fff,
-		HandName: handTypes[p>>12],
+		Value: p,
+		//HandRank: p & 0x00000fff,
+		HandName: e.handTypes[p>>12],
 	}
-}
-
-func HandTypes() []string {
-	return handTypes
 }

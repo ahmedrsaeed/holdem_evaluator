@@ -9,6 +9,7 @@ import (
 	"holdem/odds"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -90,6 +91,7 @@ func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combin
 
 		community := r.URL.Query()["community"]
 		hero := r.URL.Query()["hero"]
+		size := r.URL.Query()["size"]
 
 		heroN, err := deck.CardStringsToNumbers(hero)
 
@@ -105,7 +107,22 @@ func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combin
 			return
 		}
 
-		result, err := odds.Calculate(evaluator, combinations, heroN, communityN)
+		sizeString := "100000"
+		if len(size) > 1 {
+			badRequest(w, "send only one size per call")
+			return
+		} else if len(size) == 1 {
+			sizeString = size[0]
+		}
+
+		sampleSize, err := strconv.Atoi(sizeString)
+
+		if err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+
+		result, err := odds.Calculate(evaluator, combinations, heroN, communityN, sampleSize)
 
 		if err != nil {
 			badRequest(w, err.Error())
