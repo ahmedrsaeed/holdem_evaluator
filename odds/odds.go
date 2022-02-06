@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var exists = struct{}{}
+
 type Outcome int64
 
 const (
@@ -62,7 +64,6 @@ func getSampler(combinations [][]int) func(int) [][]int {
 		}
 
 		sampleIndexes := make(map[int]struct{})
-		exists := struct{}{}
 		rGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		for len(sampleIndexes) < desired {
@@ -102,8 +103,14 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 		return resultAccumulator, errors.New("please provide 2 hole cards")
 	}
 
-	if communityCount == 1 || communityCount == 2 || communityCount > 5 {
-		return resultAccumulator, errors.New("please provide 3 or 4 or 5 community cards")
+	acceptedCommunityCount := map[int]struct{}{
+		0: exists,
+		3: exists,
+		4: exists,
+		5: exists,
+	}
+	if _, ok := acceptedCommunityCount[communityCount]; !ok {
+		return resultAccumulator, errors.New("please provide 0 or 3 or 4 or 5 community cards")
 	}
 
 	deck := deck.AllNumberValues()
