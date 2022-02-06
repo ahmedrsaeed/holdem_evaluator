@@ -75,3 +75,17 @@ func CardStringsToNumbers(cards []string) ([]int, error) {
 
 	return mapped, nil
 }
+
+func AllNumberValues() []int {
+
+	if len(deck) != 52 {
+		panic("deck not complete")
+	}
+
+	result := make([]int, 0, len(deck))
+	for _, v := range deck {
+		result = append(result, v)
+	}
+
+	return result
+}

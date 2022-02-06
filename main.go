@@ -6,13 +6,14 @@ import (
 	"holdem/combinations"
 	"holdem/deck"
 	"holdem/handevaluator"
+	"holdem/odds"
 	"log"
 	"net/http"
 	"strings"
 )
 
-type urlHandler struct {
-	url     string
+type patternHandler struct {
+	pattern string
 	handler func(w http.ResponseWriter, r *http.Request)
 }
 
@@ -21,13 +22,13 @@ func badRequest(w http.ResponseWriter, m string) {
 	json.NewEncoder(w).Encode(map[string]string{"message": m})
 }
 
-func caselessMatcher(handlers []urlHandler) func(w http.ResponseWriter, r *http.Request) {
+func caselessMatcher(handlers []patternHandler) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		url := strings.ToLower(r.URL.Path)
+		path := strings.ToLower(r.URL.Path)
 
 		for _, h := range handlers {
-			if h.url == url {
+			if strings.ToLower(h.pattern) == path {
 				h.handler(w, r)
 				return
 			}
@@ -41,7 +42,7 @@ func handleRequests() {
 	// hand := []int{5, 10, 42, 44, 52, 2, 3}
 	// hand1 := []int{26, 28, 35, 47, 2, 3, 29}
 
-	_ = combinations.New()
+	combinations := combinations.New()
 	evaluator, err := handevaluator.New()
 
 	if err != nil {
@@ -49,9 +50,9 @@ func handleRequests() {
 		return
 	}
 
-	http.HandleFunc("/", caselessMatcher([]urlHandler{
-		{url: "/evaluatehand", handler: getHandEvaluator(evaluator)},
-		{url: "/evaluateodds", handler: getOddsEvaluator(evaluator)},
+	http.HandleFunc("/", caselessMatcher([]patternHandler{
+		{pattern: "/evaluatehand", handler: getHandEvaluator(evaluator)},
+		{pattern: "/evaluateodds", handler: getOddsEvaluator(evaluator, combinations)},
 	}))
 
 	port := ":8081"
@@ -82,7 +83,7 @@ func getHandEvaluator(evaluator handevaluator.HandEvaluator) func(w http.Respons
 	}
 }
 
-func getOddsEvaluator(evaluator handevaluator.HandEvaluator) func(w http.ResponseWriter, r *http.Request) {
+func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("Endpoint Hit: evaluate odds")
@@ -90,32 +91,28 @@ func getOddsEvaluator(evaluator handevaluator.HandEvaluator) func(w http.Respons
 		community := r.URL.Query()["community"]
 		hero := r.URL.Query()["hero"]
 
-		communityCount := len(community)
-		if len(hero) != 2 {
-			badRequest(w, "Please provide 2 hole cards.")
-			return
-		}
-
-		if communityCount == 1 || communityCount == 2 || communityCount > 5 {
-			badRequest(w, "Please provide 3, 4 or 5 community cards.")
-			return
-		}
-
-		_, err := deck.CardStringsToNumbers(hero)
+		heroN, err := deck.CardStringsToNumbers(hero)
 
 		if err != nil {
 			badRequest(w, err.Error())
 			return
 		}
 
-		_, err = deck.CardStringsToNumbers(community)
+		communityN, err := deck.CardStringsToNumbers(community)
 
 		if err != nil {
 			badRequest(w, err.Error())
 			return
 		}
 
-		json.NewEncoder(w).Encode("not implemented")
+		result, err := odds.Calculate(evaluator, combinations, heroN, communityN)
+
+		if err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+
+		json.NewEncoder(w).Encode(result)
 	}
 }
 

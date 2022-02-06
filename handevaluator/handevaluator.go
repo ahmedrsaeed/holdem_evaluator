@@ -15,8 +15,10 @@ type HandEvaluator struct {
 	buffer []byte
 }
 
+const InvalidHand string = "invalid hand"
+
 var handTypes = []string{
-	"invalid hand",
+	InvalidHand,
 	"high card",
 	"one pair",
 	"two pairs",
@@ -74,4 +76,8 @@ func (e *HandEvaluator) Eval(hand []int) EvaluatedHand {
 		HandRank: p & 0x00000fff,
 		HandName: handTypes[p>>12],
 	}
+}
+
+func HandTypes() []string {
+	return handTypes
 }
