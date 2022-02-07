@@ -8,6 +8,8 @@ import (
 	"holdem/handevaluator"
 	"holdem/list"
 	"math/rand"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,6 +25,18 @@ const (
 	Invalid
 )
 
+type OddsCalculator struct {
+	deck         deck.Deck
+	evaluator    handevaluator.HandEvaluator
+	combinations combinations.Combinations
+	memo         map[string]memoizedValue
+	memoMutex    *sync.RWMutex
+	preFlopMutex *sync.Mutex
+}
+type memoizedValue struct {
+	result     Odds
+	sampleSize int
+}
 type Odds struct {
 	WinP    float32
 	LoseP   float32
@@ -34,6 +48,19 @@ type Odds struct {
 	Tie     int
 	Hero    map[string]int
 	Villain map[string]int
+}
+
+func NewCalculator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations, deck deck.Deck) OddsCalculator {
+	c := OddsCalculator{
+		evaluator:    evaluator,
+		combinations: combinations,
+		deck:         deck,
+		memo:         map[string]memoizedValue{},
+		memoMutex:    &sync.RWMutex{},
+		preFlopMutex: &sync.Mutex{},
+	}
+
+	return c
 }
 
 func combinationsToCards(available []int, combinations [][]int) [][]int {
@@ -53,7 +80,13 @@ func combinationsToCards(available []int, combinations [][]int) [][]int {
 	return out
 }
 
-func getSampler(combinations [][]int) func(int) [][]int {
+func (calc *OddsCalculator) getCombinationsSampler(n int, r int) (func(int) [][]int, error) {
+
+	combinations, err := calc.combinations.Get(n, r)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return func(desired int) [][]int {
 
@@ -77,11 +110,73 @@ func getSampler(combinations [][]int) func(int) [][]int {
 		}
 
 		return sampled
-	}
+	}, nil
 }
 
-func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations,
-	hero []int, community []int, sampleSize int) (Odds, error) {
+func (calc *OddsCalculator) hasDuplicates(inputs ...[]int) (string, bool) {
+
+	found := map[int]struct{}{}
+
+	for _, cards := range inputs {
+		for _, c := range cards {
+			if _, ok := found[c]; ok {
+				return calc.deck.NumberToString(c), true
+			}
+			found[c] = exists
+		}
+	}
+
+	return "", false
+}
+
+func clone(in []int) []int {
+	out := make([]int, len(in))
+	copy(out, in)
+	return out
+}
+
+func sortInts(in []int) []int {
+	out := clone(in)
+	sort.Ints(out)
+	return out
+}
+
+func (calc *OddsCalculator) getMemoKey(hero []int, community []int) string {
+
+	sortedHero := sortInts(hero)
+
+	if len(community) == 0 && len(hero) == 2 {
+
+		heroValues := calc.deck.Values(sortedHero)
+		if calc.deck.SameSuit(sortedHero) {
+			return strings.Join(append(heroValues, "same-suit"), "-")
+		}
+		return strings.Join(append(heroValues, "different-suit"), "-")
+	}
+
+	communityStrings, err := calc.deck.NumbersToString(sortInts(community))
+
+	if err != nil {
+		return err.Error()
+	}
+
+	heroStrings, err := calc.deck.NumbersToString(sortedHero)
+
+	if err != nil {
+		return err.Error()
+	}
+
+	return strings.Join(append(append(heroStrings, "<-hero|community->"), communityStrings...), "-")
+}
+
+func (calc *OddsCalculator) readFromMemo(key string) (memoizedValue, bool) {
+	calc.memoMutex.RLock()
+	defer calc.memoMutex.RUnlock()
+	value, ok := calc.memo[key]
+	return value, ok
+}
+
+func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []string, sampleSize int) (Odds, error) {
 
 	handTypesMap := func() map[string]int {
 		htmap := map[string]int{}
@@ -96,6 +191,24 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 	resultAccumulator := Odds{
 		Hero:    handTypesMap(),
 		Villain: handTypesMap(),
+	}
+
+	const maxSampleSize = 100000
+	const minSampleSize = 1000
+	if sampleSize < minSampleSize || sampleSize > maxSampleSize {
+		return resultAccumulator, fmt.Errorf("sample size between %d and %d is allowed", minSampleSize, maxSampleSize)
+	}
+
+	hero, err := calc.deck.CardStringsToNumbers(heroStrings)
+
+	if err != nil {
+		return resultAccumulator, err
+	}
+
+	community, err := calc.deck.CardStringsToNumbers(communityStrings)
+
+	if err != nil {
+		return resultAccumulator, err
 	}
 
 	communityCount := len(community)
@@ -113,13 +226,36 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 		return resultAccumulator, errors.New("please provide 0 or 3 or 4 or 5 community cards")
 	}
 
-	deck := deck.AllNumberValues()
+	if duplicate, found := calc.hasDuplicates(hero, community); found {
+		return resultAccumulator, errors.New("found more than one " + duplicate)
+	}
+
+	memoKey := calc.getMemoKey(hero, community)
+	fmt.Println("Memo Key: " + memoKey)
+
+	if cached, ok := calc.readFromMemo(memoKey); ok && cached.sampleSize >= sampleSize {
+		fmt.Println("Serving cached")
+		return cached.result, nil
+	}
+
+	if communityCount == 0 && sampleSize > 5000 {
+		fmt.Println("Waiting to compute expensive preflop " + memoKey)
+		calc.preFlopMutex.Lock()
+		defer calc.preFlopMutex.Unlock()
+
+		if cached, ok := calc.readFromMemo(memoKey); ok && cached.sampleSize >= sampleSize {
+			fmt.Println("expensive preflop now in cache " + memoKey)
+			return cached.result, nil
+		}
+	}
+
+	deck := calc.deck.AllNumberValues()
 	knownToVillain := append(hero, community...)
 	availableToVillain := list.Filter(deck, func(dc int) bool {
 		return !list.Includes(knownToVillain, dc)
 	})
 	availableToVillainCount := len(availableToVillain)
-	villainCombinations, err := combinations.Get(availableToVillainCount, 2)
+	villainCombinations, err := calc.combinations.Get(availableToVillainCount, 2)
 
 	if err != nil {
 		return resultAccumulator, err
@@ -128,9 +264,8 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 	villainHands := combinationsToCards(availableToVillain, villainCombinations)
 	remainingCommunityCount := 5 - communityCount
 
-	communityCombinations, err := combinations.Get(availableToVillainCount-2, remainingCommunityCount)
+	sampleCommunityCombinations, err := calc.getCombinationsSampler(availableToVillainCount-2, remainingCommunityCount)
 
-	sampleCommunityCombinations := getSampler(communityCombinations)
 	if err != nil {
 		return resultAccumulator, err
 	}
@@ -154,12 +289,13 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 
 			for _, remaining := range remainingCommunitiesSample {
 
-				heroResult := evaluator.Eval(community, remaining, hero)
-				villainResult := evaluator.Eval(community, remaining, govillain)
+				heroResult := calc.evaluator.Eval(community, remaining, hero)
+				villainResult := calc.evaluator.Eval(community, remaining, govillain)
 
 				switch {
 
 				case villainResult.HandName == handevaluator.InvalidHand:
+					fallthrough
 				case heroResult.HandName == handevaluator.InvalidHand:
 					currentResult.Invalid++
 				case villainResult.Value < heroResult.Value:
@@ -200,5 +336,18 @@ func Calculate(evaluator handevaluator.HandEvaluator, combinations combinations.
 	resultAccumulator.LoseP = float32(resultAccumulator.Lose) / float32(resultAccumulator.Total)
 	resultAccumulator.TieP = float32(resultAccumulator.Tie) / float32(resultAccumulator.Total)
 	fmt.Println("Odds evaluated")
+
+	calc.memoMutex.Lock()
+	defer calc.memoMutex.Unlock()
+	if cached, ok := calc.memo[memoKey]; ok && cached.result.Total > resultAccumulator.Total {
+		fmt.Println("result discard " + memoKey)
+		return cached.result, nil
+	}
+
+	calc.memo[memoKey] = memoizedValue{
+		result:     resultAccumulator,
+		sampleSize: sampleSize,
+	}
+
 	return resultAccumulator, nil
 }
