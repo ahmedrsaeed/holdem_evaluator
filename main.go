@@ -25,7 +25,7 @@ func badRequest(w http.ResponseWriter, m string) {
 
 func caselessMatcher(handlers []patternHandler) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:3000")
 		path := strings.ToLower(r.URL.Path)
 
 		for _, h := range handlers {
