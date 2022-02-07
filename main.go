@@ -40,10 +40,6 @@ func caselessMatcher(handlers []patternHandler) func(w http.ResponseWriter, r *h
 }
 
 func handleRequests() {
-	// hand := []int{5, 10, 42, 44, 52, 2, 3}
-	// hand1 := []int{26, 28, 35, 47, 2, 3, 29}
-
-	combinations := combinations.New()
 	evaluator, err := handevaluator.New()
 
 	if err != nil {
@@ -51,9 +47,12 @@ func handleRequests() {
 		return
 	}
 
+	deck := deck.New()
+	oddsCalculator := odds.NewCalculator(evaluator, combinations.New(), deck)
+
 	http.HandleFunc("/", caselessMatcher([]patternHandler{
-		{pattern: "/evaluatehand", handler: getHandEvaluator(evaluator)},
-		{pattern: "/evaluateodds", handler: getOddsEvaluator(evaluator, combinations)},
+		{pattern: "/evaluatehand", handler: getHandEvaluator(evaluator, deck)},
+		{pattern: "/evaluateodds", handler: getOddsEvaluator(oddsCalculator)},
 	}))
 
 	port := ":8081"
@@ -61,7 +60,7 @@ func handleRequests() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func getHandEvaluator(evaluator handevaluator.HandEvaluator) func(w http.ResponseWriter, r *http.Request) {
+func getHandEvaluator(evaluator handevaluator.HandEvaluator, deck deck.Deck) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("Endpoint Hit: evaluate hand")
@@ -84,7 +83,7 @@ func getHandEvaluator(evaluator handevaluator.HandEvaluator) func(w http.Respons
 	}
 }
 
-func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations) func(w http.ResponseWriter, r *http.Request) {
+func getOddsEvaluator(oddsCalculator odds.OddsCalculator) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("Endpoint Hit: evaluate odds")
@@ -92,20 +91,6 @@ func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combin
 		community := r.URL.Query()["community"]
 		hero := r.URL.Query()["hero"]
 		size := r.URL.Query()["size"]
-
-		heroN, err := deck.CardStringsToNumbers(hero)
-
-		if err != nil {
-			badRequest(w, err.Error())
-			return
-		}
-
-		communityN, err := deck.CardStringsToNumbers(community)
-
-		if err != nil {
-			badRequest(w, err.Error())
-			return
-		}
 
 		sizeString := "100000"
 		if len(size) > 1 {
@@ -122,7 +107,7 @@ func getOddsEvaluator(evaluator handevaluator.HandEvaluator, combinations combin
 			return
 		}
 
-		result, err := odds.Calculate(evaluator, combinations, heroN, communityN, sampleSize)
+		result, err := oddsCalculator.Calculate(hero, community, sampleSize)
 
 		if err != nil {
 			badRequest(w, err.Error())
