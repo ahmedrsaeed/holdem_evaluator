@@ -273,6 +273,8 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	results := make(chan Odds, len(villainHands))
 	var wg sync.WaitGroup
 
+	heroEvaluator := calc.evaluator.Eval(hero, community)
+
 	for vi, villain := range villainHands {
 		wg.Add(1)
 		go func(i int, govillain []int) {
@@ -284,13 +286,14 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 			availableToCommunity := list.Filter(availableToVillain, func(av int) bool {
 				return !list.Includes(govillain, av)
 			})
+			villainEvaluator := calc.evaluator.Eval(govillain, community)
 
 			remainingCommunitiesSample := combinationsToCards(availableToCommunity, sampleCommunityCombinations(sampleSize))
 
 			for _, remaining := range remainingCommunitiesSample {
 
-				heroResult := calc.evaluator.Eval(community, remaining, hero)
-				villainResult := calc.evaluator.Eval(community, remaining, govillain)
+				heroResult := heroEvaluator(remaining)
+				villainResult := villainEvaluator(remaining)
 
 				switch {
 
