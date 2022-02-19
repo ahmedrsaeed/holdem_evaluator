@@ -3,7 +3,6 @@ package combinations
 import (
 	"errors"
 	"fmt"
-	"holdem/list"
 )
 
 type Combinations struct {
@@ -33,42 +32,55 @@ func (c *Combinations) intialize() {
 
 		key, val := generate(e[0], e[1])
 		c.store[key] = val
+
 	}
 }
 
 func generate(n int, r int) (string, [][]int) {
 	all := [][]int{}
 
-	var helper func([]int, []int)
+	if (r == 0) || r > n {
+		all = append(all, []int{})
+		return key(n, r), all
+	}
 
-	helper = func(available []int, current []int) {
+	limits := make([]int, r)
+	current := make([]int, r)
+	for i := range limits {
+		limits[i] = i + n - r
+		current[i] = i
+	}
+	mod_index_end := r - 1
+	mod_index := mod_index_end
 
-		if len(current) == r {
-			all = append(all, current)
-			return
+Outer:
+	for {
+
+		for mod_index < mod_index_end {
+			mod_index += 1
+			current[mod_index] = current[mod_index-1] + 1
 		}
 
-		lastCardIndex := len(current) - 1
+		curr := make([]int, r)
+		copy(curr, current)
 
-		for _, c := range available {
+		//fmt.Println(curr)
+		all = append(all, curr)
 
-			if lastCardIndex > -1 && current[lastCardIndex] > c {
-				continue
+		for {
+
+			if current[mod_index] < limits[mod_index] {
+				current[mod_index] += 1
+				break
+			} else if mod_index > 0 {
+				mod_index -= 1
+			} else {
+				break Outer
 			}
-
-			helper(list.Filter(available, func(a int) bool {
-				return a != c
-			}), append(current, c))
 		}
 	}
 
-	available := make([]int, n)
-	for i := range available {
-		available[i] = i
-	}
-
-	helper(available, make([]int, 0))
-
+	//fmt.Println(n, r, len(all))
 	return key(n, r), all
 }
 
