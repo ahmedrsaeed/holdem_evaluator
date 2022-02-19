@@ -22,6 +22,22 @@ func Includes(in []int, n int) bool {
 	return false
 }
 
+func ValuesAtIndexes(in []int, indexes []int) []int {
+	values := make([]int, len(indexes))
+
+	for i, n := range indexes {
+		values[i] = in[n]
+	}
+
+	return values
+}
+
+func Clone(in []int) []int {
+	out := make([]int, len(in))
+	copy(out, in)
+	return out
+}
+
 //go 1.18 generics
 
 // func Map[T int | int[]}(in []T, mapper func(int) T) []T {

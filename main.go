@@ -9,6 +9,7 @@ import (
 	"holdem/odds"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 )
@@ -53,6 +54,8 @@ func handleRequests() {
 	http.HandleFunc("/", caselessMatcher([]patternHandler{
 		{pattern: "/evaluatehand", handler: getHandEvaluator(evaluator, deck)},
 		{pattern: "/evaluateodds", handler: getOddsEvaluator(oddsCalculator)},
+		//{pattern: "/generatecombinations", handler: getCombinationsGenerator()},
+		//{pattern: "/generatepairs", handler: getPairsGenerator()},
 	}))
 
 	port := ":8081"
@@ -60,6 +63,52 @@ func handleRequests() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
+// func getPairsGenerator() func(w http.ResponseWriter, r *http.Request) {
+// 	return func(w http.ResponseWriter, req *http.Request) {
+
+// 		n, err := iQueryParam(req, "n", 2)
+
+// 		if err != nil {
+// 			badRequest(w, err.Error())
+// 			return
+// 		}
+
+// 		if n < 2 || n%2 != 0 {
+// 			badRequest(w, "Please select an even n greater than 0")
+// 			return
+// 		}
+
+// 		pairs := combinations.GeneratePairs(n)
+
+// 		//fmt.Printf("%d %d %v", n, r, combinations)
+
+// 		json.NewEncoder(w).Encode(pairs)
+// 	}
+// }
+// func getCombinationsGenerator() func(w http.ResponseWriter, r *http.Request) {
+// 	return func(w http.ResponseWriter, req *http.Request) {
+
+// 		n, err := iQueryParam(req, "n", 0)
+
+// 		if err != nil {
+// 			badRequest(w, err.Error())
+// 			return
+// 		}
+
+// 		r, err := iQueryParam(req, "r", 0)
+
+// 		if err != nil {
+// 			badRequest(w, err.Error())
+// 			return
+// 		}
+
+// 		_, combinations := combinations.Generate(n, r)
+
+// 		//fmt.Printf("%d %d %v", n, r, combinations)
+
+// 		json.NewEncoder(w).Encode(combinations)
+// 	}
+// }
 func getHandEvaluator(evaluator handevaluator.HandEvaluator, deck deck.Deck) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -90,24 +139,22 @@ func getOddsEvaluator(oddsCalculator odds.OddsCalculator) func(w http.ResponseWr
 
 		community := r.URL.Query()["community"]
 		hero := r.URL.Query()["hero"]
-		size := r.URL.Query()["size"]
 
-		sizeString := "100000"
-		if len(size) > 1 {
-			badRequest(w, "send only one size per call")
-			return
-		} else if len(size) == 1 {
-			sizeString = size[0]
-		}
+		// sampleSize, err := iQueryParam(r, "size", 100000)
 
-		sampleSize, err := strconv.Atoi(sizeString)
+		// if err != nil {
+		// 	badRequest(w, err.Error())
+		// 	return
+		// }
+
+		villainCount, err := iQueryParam(r, "villaincount", 1)
 
 		if err != nil {
 			badRequest(w, err.Error())
 			return
 		}
 
-		result, err := oddsCalculator.Calculate(hero, community, sampleSize)
+		result, err := oddsCalculator.Calculate(hero, community, villainCount)
 
 		if err != nil {
 			badRequest(w, err.Error())
@@ -116,6 +163,19 @@ func getOddsEvaluator(oddsCalculator odds.OddsCalculator) func(w http.ResponseWr
 
 		json.NewEncoder(w).Encode(result)
 	}
+}
+
+func iQueryParam(r *http.Request, key string, defaultValue int) (int, error) {
+
+	values := r.URL.Query()[key]
+	if len(values) == 0 {
+		return defaultValue, nil
+	}
+	if len(values) > 1 {
+		return 0, fmt.Errorf("send only one " + key + " per call")
+	}
+
+	return strconv.Atoi(values[0])
 }
 
 func main() {
