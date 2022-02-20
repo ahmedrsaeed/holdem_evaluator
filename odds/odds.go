@@ -140,15 +140,16 @@ func (calc *OddsCalculator) showDown(
 	communityCombination <-chan combinations.Combination,
 	results chan<- Odds) {
 
-	// reusableHand := make([]int, 2)
-	// reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
+	//reusables need to be used immediately
+	reusableHand := make([]int, 2)
+	reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
 
 	comboSamplerCreator := combinationssampler.NewCreator()
 
 	for communityCombo := range communityCombination {
 
-		remainingCommunityCards := list.ValuesAtIndexes(availableToCommunity, communityCombo.Selected)
-		handEvaluator := calc.evaluator.Eval(communityKnown, remainingCommunityCards)
+		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombo.Selected)
+		handEvaluator := calc.evaluator.Eval(communityKnown, reusableRemainingCommunity)
 
 		heroResult := handEvaluator(hero)
 
@@ -188,7 +189,8 @@ func (calc *OddsCalculator) showDown(
 
 				viCombinationsSampler(func(viCombo combinations.Combination) {
 
-					villainResult := handEvaluator(list.ValuesAtIndexes(prev.cardsLeftover, viCombo.Selected))
+					list.CopyValuesAtIndexes(reusableHand, prev.cardsLeftover, viCombo.Selected)
+					villainResult := handEvaluator(reusableHand)
 
 					tieCount := prev.tieCount
 					switch {

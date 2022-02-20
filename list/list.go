@@ -32,12 +32,12 @@ func ValuesAtIndexes(in []int, indexes []int) []int {
 	return values
 }
 
-// func CopyValuesAtIndexes(dst []int, src []int, indexes []int) {
+func CopyValuesAtIndexes(dst []int, src []int, indexes []int) {
 
-// 	for dstI, srcI := range indexes {
-// 		dst[dstI] = src[srcI]
-// 	}
-// }
+	for dstI, srcI := range indexes {
+		dst[dstI] = src[srcI]
+	}
+}
 
 func Clone(in []int) []int {
 	out := make([]int, len(in))
