@@ -3,6 +3,7 @@ package odds
 import (
 	"fmt"
 	"holdem/combinations"
+	"holdem/combinationssampler"
 	"holdem/deck"
 	"holdem/handevaluator"
 	"holdem/list"
@@ -126,18 +127,28 @@ func (calc *OddsCalculator) readFromMemo(key string) (memoizedValue, bool) {
 	return value, ok
 }
 
+func remainingCommunityCardsCount(communityKnown []int) int {
+	return 5 - len(communityKnown)
+}
+
 func (calc *OddsCalculator) showDown(
 	hero []int,
-	communityFlipped []int,
+	communityKnown []int,
 	availableToCommunity []int,
 	villainCount int,
 	desiredSamplesPerVillain int,
 	communityCombination <-chan combinations.Combination,
 	results chan<- Odds) {
+
+	// reusableHand := make([]int, 2)
+	// reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
+
+	comboSamplerCreator := combinationssampler.NewCreator()
+
 	for communityCombo := range communityCombination {
 
 		remainingCommunityCards := list.ValuesAtIndexes(availableToCommunity, communityCombo.Selected)
-		handEvaluator := calc.evaluator.Eval(communityFlipped, remainingCommunityCards)
+		handEvaluator := calc.evaluator.Eval(communityKnown, remainingCommunityCards)
 
 		heroResult := handEvaluator(hero)
 
@@ -157,8 +168,17 @@ func (calc *OddsCalculator) showDown(
 		tieVillainCounts := map[int]int{}
 		cardsAvailableToVillainCount := len(communityCombo.Other)
 		lastVillainIndex := villainCount - 1
+
 		for vi := 0; vi < villainCount; vi++ {
-			villainCombinations, actualViSamples, err := calc.combinations.GetCombinationsSampler(cardsAvailableToVillainCount, 2, desiredSamplesPerVillain)
+
+			allViCombinations, err := calc.combinations.Get(cardsAvailableToVillainCount, 2)
+
+			if err != nil {
+				panic(err.Error())
+			}
+
+			viCombinationsSampler, actualViSamples := comboSamplerCreator.Create(allViCombinations, desiredSamplesPerVillain)
+
 			cardsAvailableToVillainCount -= 2
 			total *= actualViSamples
 			lossCount *= actualViSamples
@@ -166,11 +186,7 @@ func (calc *OddsCalculator) showDown(
 			tieVillainCounts[vi+1] = 0
 			for _, prev := range previousNonLossResults {
 
-				if err != nil {
-					panic(err.Error())
-				}
-
-				villainCombinations(func(viCombo combinations.Combination) {
+				viCombinationsSampler(func(viCombo combinations.Combination) {
 
 					villainResult := handEvaluator(list.ValuesAtIndexes(prev.cardsLeftover, viCombo.Selected))
 
@@ -257,7 +273,6 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		return resultAccumulator, err
 	}
 
-	communityCount := len(community)
 	if len(hero) != 2 {
 		return resultAccumulator, fmt.Errorf("please provide 2 hole cards")
 	}
@@ -268,7 +283,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		4: exists,
 		5: exists,
 	}
-	if _, ok := acceptedCommunityCount[communityCount]; !ok {
+	if _, ok := acceptedCommunityCount[len(community)]; !ok {
 		return resultAccumulator, fmt.Errorf("please provide 0 or 3 or 4 or 5 community cards")
 	}
 
@@ -301,35 +316,41 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		return !list.Includes(knownToCommunity, dc)
 	})
 	availableToCommunityCount := len(availableToCommunity)
-	remainingCommunityCount := 5 - communityCount
-	_, communityCombinationsCount, err := calc.combinations.GetCombinationsSampler(availableToCommunityCount, remainingCommunityCount, 50000)
+	remainingCommunityCount := remainingCommunityCardsCount(community)
+	//
+
+	combinationsSamplerCreator := combinationssampler.NewCreator()
+
+	allRemainingCommunityCombinations, err := calc.combinations.Get(availableToCommunityCount, remainingCommunityCount)
 
 	if err != nil {
 		return resultAccumulator, err
 	}
 
-	totalTestsDesired := 50 * 1000 * 1000.0
+	communityCombosSamplesDesiredCount := 1000 * 1000
+	totalTestsDesired := float64(communityCombosSamplesDesiredCount) * 1000.0
+	_, actualCommunityCombosSampleCount := combinationsSamplerCreator.Create(allRemainingCommunityCombinations, communityCombosSamplesDesiredCount)
 
-	desiredSamplesPerVillain := int(math.Pow(totalTestsDesired/float64(communityCombinationsCount), 1.0/float64(villainCount)))
+	desiredSamplesPerVillain := int(math.Pow(totalTestsDesired/float64(actualCommunityCombosSampleCount), 1.0/float64(villainCount)))
 	fmt.Printf("Desired Samples Per Villain %d\n", desiredSamplesPerVillain)
 
 	desiredCommunityCombinationsCount := totalTestsDesired / math.Pow(float64(desiredSamplesPerVillain), float64(villainCount))
 
-	communityCombinations, communityCombinationsCount, err := calc.combinations.GetCombinationsSampler(availableToCommunityCount, remainingCommunityCount, int(desiredCommunityCombinationsCount))
-	fmt.Printf("Community combinations count %d\n", communityCombinationsCount)
+	communityCombinationsSampler, actualCommunityCombosSampleCount := combinationsSamplerCreator.Create(allRemainingCommunityCombinations, int(desiredCommunityCombinationsCount))
+	fmt.Printf("Community combinations count %d\n", actualCommunityCombosSampleCount)
 
 	if err != nil {
 		return resultAccumulator, err
 	}
 
-	remainingCommuntiyCombinationsChannel := make(chan combinations.Combination, communityCombinationsCount)
-	results := make(chan Odds, communityCombinationsCount)
+	remainingCommuntiyCombinationsChannel := make(chan combinations.Combination, actualCommunityCombosSampleCount)
+	results := make(chan Odds, actualCommunityCombosSampleCount)
 
 	for w := 0; w < 100; w++ {
 		go calc.showDown(hero, community, availableToCommunity, villainCount, desiredSamplesPerVillain, remainingCommuntiyCombinationsChannel, results)
 	}
 
-	communityCombinations(func(remainingCombo combinations.Combination) {
+	communityCombinationsSampler(func(remainingCombo combinations.Combination) {
 		remainingCommuntiyCombinationsChannel <- remainingCombo
 	})
 
@@ -338,7 +359,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	fmt.Println("closed communtiyCombinationsChannel")
 
 	resultAccumulator.TieVillainCounts = map[int]int{}
-	for i := 0; i < communityCombinationsCount; i++ {
+	for i := 0; i < actualCommunityCombosSampleCount; i++ {
 
 		r := <-results
 		resultAccumulator.Total += r.Total

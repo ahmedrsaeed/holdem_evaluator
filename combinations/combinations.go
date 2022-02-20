@@ -1,9 +1,9 @@
 package combinations
 
 import (
+	"errors"
 	"fmt"
 	"holdem/list"
-	"math/rand"
 	"time"
 )
 
@@ -157,42 +157,17 @@ Outer:
 	return key(n, r), combinations
 }
 
-var exists = struct{}{}
-
-func (c *Combinations) GetCombinationsSampler(n int, r int, desired int) (func(func(Combination)), int, error) {
-
-	combos, ok := c.store[key(n, r)]
-
-	if !ok {
-		return nil, 0, fmt.Errorf("unable to compute: " + key(n, r))
-	}
-
-	combinationsLength := len(combos)
-
-	if combinationsLength <= desired {
-
-		return func(action func(Combination)) {
-			for _, combo := range combos {
-				action(combo)
-			}
-		}, combinationsLength, nil
-	}
-
-	return func(action func(Combination)) {
-
-		sampleIndexes := make(map[int]struct{})
-		rGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-		for len(sampleIndexes) < desired {
-			sampleIndexes[rGen.Intn(combinationsLength)] = exists
-		}
-
-		for selectedIndex := range sampleIndexes {
-			action(combos[selectedIndex])
-		}
-	}, desired, nil
-}
-
 func key(n int, r int) string {
 	return fmt.Sprintf("%dc%d", n, r)
+}
+
+func (c *Combinations) Get(n int, r int) ([]Combination, error) {
+
+	res, ok := c.store[key(n, r)]
+
+	if !ok {
+		return nil, errors.New("unable to compute " + key(n, r))
+	}
+
+	return res, nil
 }
