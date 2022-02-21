@@ -42,12 +42,19 @@ func (creator *CombinationsSamplerCreator) Create(combos []combinations.Combinat
 		sampleIndexes := make(map[int]struct{})
 
 		for len(sampleIndexes) < desired {
-			sampleIndexes[creator.rGen.Intn(combinationsLength)] = exists
+
+			randomIndex := creator.rGen.Intn(combinationsLength)
+
+			if _, ok := sampleIndexes[randomIndex]; ok {
+				continue
+			}
+			sampleIndexes[randomIndex] = exists
+			action(combos[randomIndex])
 		}
 
-		for selectedIndex := range sampleIndexes {
-			action(combos[selectedIndex])
-			//delete(creator.sampleIndexes, selectedIndex)
-		}
+		// for selectedIndex := range sampleIndexes {
+		// 	action(combos[selectedIndex])
+		// 	//delete(creator.sampleIndexes, selectedIndex)
+		// }
 	}, desired
 }
