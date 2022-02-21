@@ -34,7 +34,8 @@ func ValuesAtIndexes(in []int, indexes []int) []int {
 
 func CopyValuesAtIndexes(dst []int, src []int, indexes []int) {
 
-	for dstI, srcI := range indexes {
+	for dstI := 0; dstI < len(indexes); dstI++ {
+		srcI := indexes[dstI]
 		dst[dstI] = src[srcI]
 	}
 }
