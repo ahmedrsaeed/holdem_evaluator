@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"holdem/battleresult"
 	"holdem/combinations"
-	"holdem/combinationssampler"
 	"holdem/deck"
 	"holdem/handevaluator"
 	"holdem/list"
+	"holdem/slicesampler"
 	"math"
 	"runtime"
 	"sort"
@@ -190,7 +190,7 @@ func (calc *OddsCalculator) showDown(
 	reusableHand := make([]int, 2)
 	reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
 	battleResultPool := battleresult.NewBattleResultPool()
-	comboSampler := combinationssampler.NewSampler()
+	comboSampler := slicesampler.NewSampler()
 	lossResults := make([][]*battleresult.BattleResult, 2)
 	lossResultsMaxCap := int(math.Pow(float64(desiredSamplesPerVillain), float64(villainCount)))
 	lossResults[0] = make([]*battleresult.BattleResult, lossResultsMaxCap)
@@ -393,7 +393,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	remainingCommunityCount := remainingCommunityCardsCount(community)
 	//
 
-	combinationsSampler := combinationssampler.NewSampler()
+	combinationsSampler := slicesampler.NewSampler()
 
 	allRemainingCommunityCombinations, err := calc.combinations.Get(availableToCommunityCount, remainingCommunityCount)
 

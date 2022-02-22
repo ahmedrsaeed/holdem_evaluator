@@ -1,4 +1,4 @@
-package combinationssampler
+package slicesampler
 
 import (
 	"math/rand"
