@@ -8,19 +8,19 @@ import (
 
 type stringNumberPair struct {
 	str    string
-	number int
+	number uint8
 }
 
 type Deck struct {
 	stringNumberPair []stringNumberPair
-	stringToNumber   map[string]int
-	numberToString   map[int]string
+	stringToNumber   map[string]uint8
+	numberToString   map[uint8]string
 }
 
 func New() Deck {
 	deck := Deck{
-		stringToNumber: map[string]int{},
-		numberToString: map[int]string{},
+		stringToNumber: map[string]uint8{},
+		numberToString: map[uint8]string{},
 		stringNumberPair: []stringNumberPair{
 			{"2c", 1},
 			{"2d", 2},
@@ -85,7 +85,7 @@ func New() Deck {
 	return deck
 }
 
-func (d *Deck) SameSuit(c []int) bool {
+func (d *Deck) SameSuit(c []uint8) bool {
 
 	lastSuit := ""
 
@@ -111,7 +111,7 @@ func (d *Deck) SameSuit(c []int) bool {
 	return true
 }
 
-func (d *Deck) NumberToString(c int) string {
+func (d *Deck) NumberToString(c uint8) string {
 
 	if s, ok := d.numberToString[c]; ok {
 		return s
@@ -120,7 +120,7 @@ func (d *Deck) NumberToString(c int) string {
 	return "invalid"
 }
 
-func (d *Deck) CardNumbersToStrings(cards []int) ([]string, error) {
+func (d *Deck) CardNumbersToStrings(cards []uint8) ([]string, error) {
 
 	mapped := make([]string, len(cards))
 
@@ -136,9 +136,9 @@ func (d *Deck) CardNumbersToStrings(cards []int) ([]string, error) {
 	return mapped, nil
 }
 
-func (d *Deck) CardStringsToNumbers(cards []string) ([]int, error) {
+func (d *Deck) CardStringsToNumbers(cards []string) ([]uint8, error) {
 
-	mapped := make([]int, len(cards))
+	mapped := make([]uint8, len(cards))
 
 	for i, s := range cards {
 
@@ -152,13 +152,13 @@ func (d *Deck) CardStringsToNumbers(cards []string) ([]int, error) {
 	return mapped, nil
 }
 
-func (d *Deck) AllNumberValues() []int {
+func (d *Deck) AllNumberValues() []uint8 {
 
 	if len(d.stringToNumber) != 52 {
 		panic("deck not complete")
 	}
 
-	result := make([]int, 0, len(d.stringToNumber))
+	result := make([]uint8, 0, len(d.stringToNumber))
 
 	for _, v := range d.stringNumberPair {
 		result = append(result, v.number)

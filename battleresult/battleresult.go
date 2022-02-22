@@ -3,12 +3,12 @@ package battleresult
 import "holdem/list"
 
 type BattleResult struct {
-	leftOverCards      []int
+	leftOverCards      []uint8
 	leftOverCardsCount int
 	tieCount           int
 }
 
-func (br *BattleResult) LeftOverCards() []int {
+func (br *BattleResult) LeftOverCards() []uint8 {
 	return br.leftOverCards[:br.leftOverCardsCount]
 }
 func (br *BattleResult) TieCount() int {
@@ -29,7 +29,7 @@ func (pool *BattleResultPool) ReturnToPool(lo *BattleResult) {
 	pool.battleResultsAvailable = append(pool.battleResultsAvailable, lo)
 }
 
-func (pool *BattleResultPool) From(src []int, indexes []int, tieCount int) *BattleResult {
+func (pool *BattleResultPool) From(src []uint8, indexes []uint8, tieCount int) *BattleResult {
 
 	lastAvailableBattleIndex := len(pool.battleResultsAvailable) - 1
 

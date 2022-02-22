@@ -12,8 +12,8 @@ type Combinations struct {
 }
 
 type Combination struct {
-	Selected []int
-	Other    []int
+	Selected []uint8
+	Other    []uint8
 }
 
 func New() Combinations {
@@ -24,7 +24,7 @@ func New() Combinations {
 
 func (c *Combinations) intialize() {
 
-	villainCombinations := [][]int{
+	villainCombinations := [][]uint8{
 		{52, 2},
 		{50, 5},
 		{47, 2},
@@ -46,32 +46,32 @@ func (c *Combinations) intialize() {
 
 		t := time.Now()
 		key, combos := generate(e[0], e[1])
-		fmt.Printf("%v t:%f\n", e, time.Since(t).Minutes())
+		fmt.Printf("%v t:%f l:%d\n", e, time.Since(t).Minutes(), len(combos))
 		c.store[key] = combos
 	}
 }
 
-func generate(n int, r int) (string, []Combination) {
+func generate(n uint8, r uint8) (string, []Combination) {
 	combinations := []Combination{}
 
-	allIndexes := make([]int, n)
+	allIndexes := make([]uint8, n)
 	for i := range allIndexes {
-		allIndexes[i] = i
+		allIndexes[i] = uint8(i)
 	}
 
 	if (r == 0) || r > n {
-		combinations = append(combinations, Combination{Selected: []int{}, Other: allIndexes})
+		combinations = append(combinations, Combination{Selected: []uint8{}, Other: allIndexes})
 		return key(n, r), combinations
 	}
 
-	limits := make([]int, r)
-	current := make([]int, r)
+	limits := make([]uint8, r)
+	current := make([]uint8, r)
 	for i := range limits {
-		limits[i] = i + n - r
-		current[i] = i
+		limits[i] = uint8(i) + n - r
+		current[i] = uint8(i)
 	}
-	mod_index_end := r - 1
-	mod_index := mod_index_end
+	var mod_index_end int = int(r) - 1
+	var mod_index int = mod_index_end //int to allow for negative mod_index
 
 Outer:
 	for {
@@ -83,7 +83,7 @@ Outer:
 
 		currSelected := list.Clone(current)
 
-		other := list.Filter(allIndexes, func(i int) bool {
+		other := list.Filter(allIndexes, func(i uint8) bool {
 			return !list.Includes(currSelected, i)
 		})
 
@@ -107,11 +107,11 @@ Outer:
 	return key(n, r), combinations
 }
 
-func key(n int, r int) string {
+func key(n uint8, r uint8) string {
 	return fmt.Sprintf("%dc%d", n, r)
 }
 
-func (c *Combinations) Get(n int, r int) ([]Combination, error) {
+func (c *Combinations) Get(n uint8, r uint8) ([]Combination, error) {
 
 	res, ok := c.store[key(n, r)]
 
@@ -122,29 +122,29 @@ func (c *Combinations) Get(n int, r int) ([]Combination, error) {
 	return res, nil
 }
 
-func (c *Combinations) GetAllPossiblePairs(available []int) ([][]int, map[int]map[int]int, error) {
-	combos, err := c.Get(len(available), 2)
+// func (c *Combinations) GetAllPossiblePairs(available []int) ([][]int, map[int]map[int]int, error) {
+// 	combos, err := c.Get(len(available), 2)
 
-	if err != nil {
-		return nil, nil, err
-	}
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
 
-	pairs := make([][]int, len(combos))
+// 	pairs := make([][]int, len(combos))
 
-	for i, combo := range combos {
+// 	for i, combo := range combos {
 
-		pairs[i] = list.ValuesAtIndexes(available, combo.Selected)
-	}
+// 		pairs[i] = list.ValuesAtIndexes(available, combo.Selected)
+// 	}
 
-	pairsIndexMap := make(map[int]map[int]int)
+// 	pairsIndexMap := make(map[int]map[int]int)
 
-	for _, a := range available {
-		pairsIndexMap[a] = make(map[int]int)
-	}
+// 	for _, a := range available {
+// 		pairsIndexMap[a] = make(map[int]int)
+// 	}
 
-	for i, p := range pairs {
-		pairsIndexMap[p[0]][p[1]] = i
-	}
+// 	for i, p := range pairs {
+// 		pairsIndexMap[p[0]][p[1]] = i
+// 	}
 
-	return pairs, pairsIndexMap, nil
-}
+// 	return pairs, pairsIndexMap, nil
+// }

@@ -1,8 +1,8 @@
 package list
 
-func Filter(in []int, predicate func(int) bool) []int {
+func Filter(in []uint8, predicate func(uint8) bool) []uint8 {
 
-	out := []int{}
+	out := []uint8{}
 
 	for _, n := range in {
 		if predicate(n) {
@@ -13,7 +13,7 @@ func Filter(in []int, predicate func(int) bool) []int {
 	return out
 }
 
-func Includes(in []int, n int) bool {
+func Includes(in []uint8, n uint8) bool {
 	for _, c := range in {
 		if c == n {
 			return true
@@ -22,8 +22,8 @@ func Includes(in []int, n int) bool {
 	return false
 }
 
-func ValuesAtIndexes(in []int, indexes []int) []int {
-	values := make([]int, len(indexes))
+func ValuesAtIndexes(in []uint8, indexes []uint8) []uint8 {
+	values := make([]uint8, len(indexes))
 
 	for i, n := range indexes {
 		values[i] = in[n]
@@ -32,7 +32,7 @@ func ValuesAtIndexes(in []int, indexes []int) []int {
 	return values
 }
 
-func CopyValuesAtIndexes(dst []int, src []int, indexes []int) {
+func CopyValuesAtIndexes(dst []uint8, src []uint8, indexes []uint8) {
 
 	for dstI := 0; dstI < len(indexes); dstI++ {
 		srcI := indexes[dstI]
@@ -40,8 +40,8 @@ func CopyValuesAtIndexes(dst []int, src []int, indexes []int) {
 	}
 }
 
-func Clone(in []int) []int {
-	out := make([]int, len(in))
+func Clone(in []uint8) []uint8 {
+	out := make([]uint8, len(in))
 	copy(out, in)
 	return out
 }

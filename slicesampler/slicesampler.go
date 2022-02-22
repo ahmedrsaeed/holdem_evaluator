@@ -23,7 +23,7 @@ func NewSampler() Sampler {
 
 var exists = struct{}{}
 
-func (sampler *Sampler) Setup(sliceLength int, desired int) int {
+func (sampler *Sampler) Reset(sliceLength int, desired int) int {
 
 	sampler.nextNonRandomIndex = 0
 	sampler.sliceLength = sliceLength

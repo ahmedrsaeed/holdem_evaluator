@@ -67,7 +67,7 @@ func (e *HandEvaluator) intializeBuffer() error {
 	return nil
 }
 
-func (e *HandEvaluator) fromBuffer(p uint32, hand ...[]int) uint32 {
+func (e *HandEvaluator) fromBuffer(p uint32, hand ...[]uint8) uint32 {
 
 	for _, subset := range hand {
 		for _, c := range subset {
@@ -79,11 +79,11 @@ func (e *HandEvaluator) fromBuffer(p uint32, hand ...[]int) uint32 {
 	return p
 }
 
-func (e *HandEvaluator) Eval(partial ...[]int) func([]int) EvaluatedHand {
+func (e *HandEvaluator) Eval(partial ...[]uint8) func([]uint8) EvaluatedHand {
 
 	partialResult := e.fromBuffer(uint32(53), partial...)
 
-	return func(rest []int) EvaluatedHand {
+	return func(rest []uint8) EvaluatedHand {
 
 		finalResult := e.fromBuffer(partialResult, rest)
 		return EvaluatedHand{

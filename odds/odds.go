@@ -18,14 +18,14 @@ import (
 var exists = struct{}{}
 
 type OddsCalculator struct {
-	deck                     deck.Deck
-	evaluator                handevaluator.HandEvaluator
-	combinations             combinations.Combinations
-	memo                     map[string]memoizedValue
-	memoMutex                *sync.RWMutex
-	preFlopMutex             *sync.Mutex
-	allPossiblePairs         [][]string
-	allPossiblePairsIndexMap map[int]map[int]int
+	deck         deck.Deck
+	evaluator    handevaluator.HandEvaluator
+	combinations combinations.Combinations
+	memo         map[string]memoizedValue
+	memoMutex    *sync.RWMutex
+	preFlopMutex *sync.Mutex
+	// allPossiblePairs         [][]string
+	// allPossiblePairsIndexMap map[int]map[int]int
 }
 type memoizedValue struct {
 	result     Odds
@@ -72,22 +72,22 @@ type oddsRaw struct {
 
 func NewCalculator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations, deck deck.Deck) OddsCalculator {
 
-	allPossibleNumberPairs, allPossiblePairsIndexMap, err := combinations.GetAllPossiblePairs(deck.AllNumberValues())
+	// allPossibleNumberPairs, allPossiblePairsIndexMap, err := combinations.GetAllPossiblePairs(deck.AllNumberValues())
 
-	if err != nil {
-		panic(err)
-	}
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	allPossibleStringPairs := make([][]string, len(allPossibleNumberPairs))
+	// allPossibleStringPairs := make([][]string, len(allPossibleNumberPairs))
 
-	for i, nPair := range allPossibleNumberPairs {
+	// for i, nPair := range allPossibleNumberPairs {
 
-		res, err := deck.CardNumbersToStrings(nPair)
-		if err != nil {
-			panic(err)
-		}
-		allPossibleStringPairs[i] = res
-	}
+	// 	res, err := deck.CardNumbersToStrings(nPair)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	allPossibleStringPairs[i] = res
+	// }
 
 	// for i, x := range allPossibleNumberPairs {
 
@@ -95,22 +95,22 @@ func NewCalculator(evaluator handevaluator.HandEvaluator, combinations combinati
 	// }
 
 	c := OddsCalculator{
-		evaluator:                evaluator,
-		combinations:             combinations,
-		deck:                     deck,
-		memo:                     map[string]memoizedValue{},
-		memoMutex:                &sync.RWMutex{},
-		preFlopMutex:             &sync.Mutex{},
-		allPossiblePairs:         allPossibleStringPairs,
-		allPossiblePairsIndexMap: allPossiblePairsIndexMap,
+		evaluator:    evaluator,
+		combinations: combinations,
+		deck:         deck,
+		memo:         map[string]memoizedValue{},
+		memoMutex:    &sync.RWMutex{},
+		preFlopMutex: &sync.Mutex{},
+		// allPossiblePairs:         allPossibleStringPairs,
+		// allPossiblePairsIndexMap: allPossiblePairsIndexMap,
 	}
 
 	return c
 }
 
-func (calc *OddsCalculator) hasDuplicates(inputs ...[]int) (string, bool) {
+func (calc *OddsCalculator) hasDuplicates(inputs ...[]uint8) (string, bool) {
 
-	found := map[int]struct{}{}
+	found := map[uint8]struct{}{}
 
 	for _, cards := range inputs {
 		for _, c := range cards {
@@ -124,15 +124,15 @@ func (calc *OddsCalculator) hasDuplicates(inputs ...[]int) (string, bool) {
 	return "", false
 }
 
-func sortInts(in []int) []int {
+func sortUInt8s(in []uint8) []uint8 {
 	out := list.Clone(in)
-	sort.Ints(out)
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
 
-func (calc *OddsCalculator) getMemoKey(hero []int, community []int, villainCount int) string {
+func (calc *OddsCalculator) getMemoKey(hero []uint8, community []uint8, villainCount int) string {
 
-	sortedHero := sortInts(hero)
+	sortedHero := sortUInt8s(hero)
 	villains := fmt.Sprintf("<-hero|%dvillains|community->", villainCount)
 
 	if len(community) == 0 && len(hero) == 2 {
@@ -148,7 +148,7 @@ func (calc *OddsCalculator) getMemoKey(hero []int, community []int, villainCount
 		return strings.Join(append(heroValues, "different-suit|", villains), "-")
 	}
 
-	communityStrings, err := calc.deck.CardNumbersToStrings(sortInts(community))
+	communityStrings, err := calc.deck.CardNumbersToStrings(sortUInt8s(community))
 
 	if err != nil {
 		return err.Error()
@@ -172,14 +172,14 @@ func (calc *OddsCalculator) readFromMemo(key string) (memoizedValue, bool) {
 	return value, ok
 }
 
-func remainingCommunityCardsCount(communityKnown []int) int {
+func remainingCommunityCardsCount(communityKnown []uint8) int {
 	return 5 - len(communityKnown)
 }
 
 func (calc *OddsCalculator) showDown(
-	hero []int,
-	communityKnown []int,
-	availableToCommunity []int,
+	hero []uint8,
+	communityKnown []uint8,
+	availableToCommunity []uint8,
 	villainCount int,
 	desiredSamplesPerVillain int,
 	communityCombinations []combinations.Combination,
@@ -187,8 +187,8 @@ func (calc *OddsCalculator) showDown(
 	results chan<- oddsRaw) {
 
 	//reusables need to be used immediately
-	reusableHand := make([]int, 2)
-	reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
+	reusableHand := make([]uint8, 2)
+	reusableRemainingCommunity := make([]uint8, remainingCommunityCardsCount(communityKnown))
 	battleResultPool := battleresult.NewBattleResultPool()
 	comboSampler := slicesampler.NewSampler()
 	lossResults := make([][]*battleresult.BattleResult, 2)
@@ -228,7 +228,7 @@ func (calc *OddsCalculator) showDown(
 			battleResultPool.From(availableToCommunity, communityCombinations[communityComboIndex].Other, 0),
 		)
 
-		cardsAvailableToVillainCount := len(communityCombinations[communityComboIndex].Other)
+		cardsAvailableToVillainCount := uint8(len(communityCombinations[communityComboIndex].Other))
 		lastVillainIndex := villainCount - 1
 
 		for vi := 0; vi < villainCount; vi++ {
@@ -239,14 +239,14 @@ func (calc *OddsCalculator) showDown(
 				panic(err.Error())
 			}
 
-			actualViSamples := comboSampler.Setup(len(allViCombinations), desiredSamplesPerVillain)
+			actualViSamples := comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
 			cardsAvailableToVillainCount -= 2
 			total *= actualViSamples
 			showDownsLost *= actualViSamples
 			currentNonLossResults := lossResults[vi%2][:0]
 			for _, prev := range previousNonLossResults {
 
-				comboSampler.Setup(len(allViCombinations), desiredSamplesPerVillain)
+				comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
 				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
 					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), allViCombinations[viComboIndex].Selected)
 					villainResult := handEvaluator(reusableHand)
@@ -386,11 +386,11 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 
 	deck := calc.deck.AllNumberValues()
 	knownToCommunity := append(hero, community...)
-	availableToCommunity := list.Filter(deck, func(dc int) bool {
+	availableToCommunity := list.Filter(deck, func(dc uint8) bool {
 		return !list.Includes(knownToCommunity, dc)
 	})
-	availableToCommunityCount := len(availableToCommunity)
-	remainingCommunityCount := remainingCommunityCardsCount(community)
+	availableToCommunityCount := uint8(len(availableToCommunity))
+	remainingCommunityCount := uint8(remainingCommunityCardsCount(community))
 	//
 
 	combinationsSampler := slicesampler.NewSampler()
@@ -402,15 +402,15 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	}
 
 	communityCombosSamplesTargetCount := 300 * 1000
-	totalTestsDesired := float64(communityCombosSamplesTargetCount) * 3000.0
-	actualCommunityCombosSampleCount := combinationsSampler.Setup(len(allRemainingCommunityCombinations), communityCombosSamplesTargetCount)
+	totalTestsDesired := float64(communityCombosSamplesTargetCount) * 20000.0
+	actualCommunityCombosSampleCount := combinationsSampler.Reset(len(allRemainingCommunityCombinations), communityCombosSamplesTargetCount)
 
 	desiredSamplesPerVillain := int(math.Pow(totalTestsDesired/float64(actualCommunityCombosSampleCount), 1.0/float64(villainCount)))
 	communityCombinationsReadjustedTargetCount := totalTestsDesired / math.Pow(float64(desiredSamplesPerVillain), float64(villainCount))
 	fmt.Printf("%d villains\n", villainCount)
 	fmt.Printf("Desired Samples Per Villain %d\n", desiredSamplesPerVillain)
 
-	actualCommunityCombosSampleReadjustedCount := combinationsSampler.Setup(len(allRemainingCommunityCombinations), int(communityCombinationsReadjustedTargetCount))
+	actualCommunityCombosSampleReadjustedCount := combinationsSampler.Reset(len(allRemainingCommunityCombinations), int(communityCombinationsReadjustedTargetCount))
 	fmt.Printf("Community combinations count %d\n", actualCommunityCombosSampleReadjustedCount)
 
 	if err != nil {
