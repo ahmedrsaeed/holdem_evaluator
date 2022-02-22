@@ -183,7 +183,7 @@ func (calc *OddsCalculator) showDown(
 	villainCount int,
 	desiredSamplesPerVillain int,
 	communityCombinations []combinations.Combination,
-	communityCombinationIndex <-chan int,
+	communityCombinationIndex <-chan int32,
 	results chan<- oddsRaw) {
 
 	//reusables need to be used immediately
@@ -307,6 +307,7 @@ func (calc *OddsCalculator) showDown(
 		rawOdds.hero[heroResult.HandName] += total
 	}
 
+	//comboSampler.PrintDuplicateCount("go routine")
 	results <- rawOdds
 }
 
@@ -417,7 +418,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		return resultAccumulator, err
 	}
 
-	remainingCommuntiyCombinationsIndexChannel := make(chan int, actualCommunityCombosSampleReadjustedCount)
+	remainingCommuntiyCombinationsIndexChannel := make(chan int32, actualCommunityCombosSampleReadjustedCount)
 	workerCount := runtime.NumCPU()
 	results := make(chan oddsRaw, workerCount)
 
@@ -433,6 +434,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	}
 
 	close(remainingCommuntiyCombinationsIndexChannel)
+	//combinationsSampler.PrintDuplicateCount("main")
 
 	fmt.Println("closed communtiyCombinationsChannel")
 

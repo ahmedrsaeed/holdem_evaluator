@@ -6,61 +6,68 @@ import (
 )
 
 type Sampler struct {
-	sliceLength        int
+	sliceLength        int32
 	desired            int
-	sampleIndexes      map[int]struct{}
+	sampleIndexes      []bool
+	blank              []bool
 	rGen               *rand.Rand
-	nextNonRandomIndex int
+	nextNonRandomIndex int32
 	shouldSample       bool
 }
 
 func NewSampler() Sampler {
 	return Sampler{
-		sampleIndexes: make(map[int]struct{}),
+		blank:         make([]bool, 0),
+		sampleIndexes: make([]bool, 0),
 		rGen:          rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
-var exists = struct{}{}
-
 func (sampler *Sampler) Reset(sliceLength int, desired int) int {
 
+	if sliceLength > 1<<31-1 {
+		panic("can't use Rand.Int31")
+	}
+
 	sampler.nextNonRandomIndex = 0
-	sampler.sliceLength = sliceLength
-	sampler.desired = desired
+	sampler.sliceLength = int32(sliceLength)
 	sampler.shouldSample = sliceLength > desired
 
-	for k := range sampler.sampleIndexes {
-		delete(sampler.sampleIndexes, k)
+	if !sampler.shouldSample {
+		sampler.desired = sliceLength
+		return sliceLength
+	}
+	sampler.desired = desired
+
+	switch {
+
+	case len(sampler.sampleIndexes) < sliceLength:
+		sampler.sampleIndexes = make([]bool, sliceLength)
+	case len(sampler.blank) < len(sampler.sampleIndexes):
+		sampler.blank = make([]bool, len(sampler.sampleIndexes))
+		fallthrough
+	default:
+		copy(sampler.sampleIndexes, sampler.blank)
 	}
 
-	if sampler.shouldSample {
-		return desired
-	}
-	return sliceLength
+	return desired
 }
 
-func (sampler *Sampler) Next() int {
+func (sampler *Sampler) Next() int32 {
 
-	if sampler.shouldSample {
+	if sampler.nextNonRandomIndex < int32(sampler.desired) {
+		sampler.nextNonRandomIndex += 1
 
-		if len(sampler.sampleIndexes) < sampler.desired {
-
+		if sampler.shouldSample {
 			for {
-				randomIndex := sampler.rGen.Intn(sampler.sliceLength)
-				if _, ok := sampler.sampleIndexes[randomIndex]; ok {
+				randomIndex := sampler.rGen.Int31n(sampler.sliceLength)
+				if sampler.sampleIndexes[randomIndex] {
 					continue
 				}
-				sampler.sampleIndexes[randomIndex] = exists
+				sampler.sampleIndexes[randomIndex] = true
 				return randomIndex
 			}
 		}
-
-		return -1
-	}
-
-	if sampler.nextNonRandomIndex < sampler.sliceLength {
-		sampler.nextNonRandomIndex += 1
 		return sampler.nextNonRandomIndex - 1
 	} else {
 		return -1

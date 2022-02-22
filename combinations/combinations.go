@@ -47,6 +47,9 @@ func (c *Combinations) intialize() {
 		t := time.Now()
 		key, combos := generate(e[0], e[1])
 		fmt.Printf("%v t:%f l:%d\n", e, time.Since(t).Minutes(), len(combos))
+		if len(combos) > 1<<31-1 {
+			panic("can't use Rand.Int31 for sampling")
+		}
 		c.store[key] = combos
 	}
 }
