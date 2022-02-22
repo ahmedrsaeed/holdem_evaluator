@@ -182,14 +182,15 @@ func (calc *OddsCalculator) showDown(
 	availableToCommunity []int,
 	villainCount int,
 	desiredSamplesPerVillain int,
-	communityCombination <-chan combinations.Combination,
+	communityCombinations []combinations.Combination,
+	communityCombinationIndex <-chan int,
 	results chan<- oddsRaw) {
 
 	//reusables need to be used immediately
 	reusableHand := make([]int, 2)
 	reusableRemainingCommunity := make([]int, remainingCommunityCardsCount(communityKnown))
 	battleResultPool := battleresult.NewBattleResultPool()
-	comboSamplerCreator := combinationssampler.NewCreator()
+	comboSampler := combinationssampler.NewSampler()
 	lossResults := make([][]*battleresult.BattleResult, 2)
 	lossResultsMaxCap := int(math.Pow(float64(desiredSamplesPerVillain), float64(villainCount)))
 	lossResults[0] = make([]*battleresult.BattleResult, lossResultsMaxCap)
@@ -207,9 +208,9 @@ func (calc *OddsCalculator) showDown(
 		hero: map[string]int{},
 	}
 
-	for communityCombo := range communityCombination {
+	for communityComboIndex := range communityCombinationIndex {
 
-		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombo.Selected)
+		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombinations[communityComboIndex].Selected)
 		handEvaluator := calc.evaluator.Eval(communityKnown, reusableRemainingCommunity)
 
 		heroResult := handEvaluator(hero)
@@ -224,10 +225,10 @@ func (calc *OddsCalculator) showDown(
 		total := 1
 		previousNonLossResults := append(
 			lossResults[1][:0],
-			battleResultPool.From(availableToCommunity, communityCombo.Other, 0),
+			battleResultPool.From(availableToCommunity, communityCombinations[communityComboIndex].Other, 0),
 		)
 
-		cardsAvailableToVillainCount := len(communityCombo.Other)
+		cardsAvailableToVillainCount := len(communityCombinations[communityComboIndex].Other)
 		lastVillainIndex := villainCount - 1
 
 		for vi := 0; vi < villainCount; vi++ {
@@ -238,17 +239,16 @@ func (calc *OddsCalculator) showDown(
 				panic(err.Error())
 			}
 
-			viCombinationsSampler, actualViSamples := comboSamplerCreator.Create(allViCombinations, desiredSamplesPerVillain)
-
+			actualViSamples := comboSampler.Setup(len(allViCombinations), desiredSamplesPerVillain)
 			cardsAvailableToVillainCount -= 2
 			total *= actualViSamples
 			showDownsLost *= actualViSamples
 			currentNonLossResults := lossResults[vi%2][:0]
 			for _, prev := range previousNonLossResults {
 
-				viCombinationsSampler(func(viCombo combinations.Combination) {
-
-					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), viCombo.Selected)
+				comboSampler.Setup(len(allViCombinations), desiredSamplesPerVillain)
+				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
+					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), allViCombinations[viComboIndex].Selected)
 					villainResult := handEvaluator(reusableHand)
 
 					// viKey := -1
@@ -268,7 +268,7 @@ func (calc *OddsCalculator) showDown(
 						// if viKey > -1 {
 						// 	rawOdds.villainHandsLostTo[viKey] += 1
 						// }
-						return
+						continue
 					case villainResult.Value == heroResult.Value:
 						currentTieCount++
 						// if viKey > -1 {
@@ -285,15 +285,15 @@ func (calc *OddsCalculator) showDown(
 							showDownsTied++
 							rawOdds.tieVillainCounts[currentTieCount] += 1
 						}
-						return
+						continue
 					}
 
 					//println("I should not be reached for one villain")
 
 					currentNonLossResults = append(
 						currentNonLossResults,
-						battleResultPool.From(prev.LeftOverCards(), viCombo.Other, currentTieCount))
-				})
+						battleResultPool.From(prev.LeftOverCards(), allViCombinations[viComboIndex].Other, currentTieCount))
+				}
 
 				battleResultPool.ReturnToPool(prev)
 			}
@@ -393,7 +393,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	remainingCommunityCount := remainingCommunityCardsCount(community)
 	//
 
-	combinationsSamplerCreator := combinationssampler.NewCreator()
+	combinationsSampler := combinationssampler.NewSampler()
 
 	allRemainingCommunityCombinations, err := calc.combinations.Get(availableToCommunityCount, remainingCommunityCount)
 
@@ -403,35 +403,36 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 
 	communityCombosSamplesTargetCount := 300 * 1000
 	totalTestsDesired := float64(communityCombosSamplesTargetCount) * 3000.0
-	_, actualCommunityCombosSampleCount := combinationsSamplerCreator.Create(allRemainingCommunityCombinations, communityCombosSamplesTargetCount)
+	actualCommunityCombosSampleCount := combinationsSampler.Setup(len(allRemainingCommunityCombinations), communityCombosSamplesTargetCount)
 
 	desiredSamplesPerVillain := int(math.Pow(totalTestsDesired/float64(actualCommunityCombosSampleCount), 1.0/float64(villainCount)))
 	communityCombinationsReadjustedTargetCount := totalTestsDesired / math.Pow(float64(desiredSamplesPerVillain), float64(villainCount))
 	fmt.Printf("%d villains\n", villainCount)
 	fmt.Printf("Desired Samples Per Villain %d\n", desiredSamplesPerVillain)
 
-	communityCombinationsSampler, actualCommunityCombosSampleCount := combinationsSamplerCreator.Create(allRemainingCommunityCombinations, int(communityCombinationsReadjustedTargetCount))
-	fmt.Printf("Community combinations count %d\n", actualCommunityCombosSampleCount)
+	actualCommunityCombosSampleReadjustedCount := combinationsSampler.Setup(len(allRemainingCommunityCombinations), int(communityCombinationsReadjustedTargetCount))
+	fmt.Printf("Community combinations count %d\n", actualCommunityCombosSampleReadjustedCount)
 
 	if err != nil {
 		return resultAccumulator, err
 	}
 
-	remainingCommuntiyCombinationsChannel := make(chan combinations.Combination, actualCommunityCombosSampleCount)
+	remainingCommuntiyCombinationsIndexChannel := make(chan int, actualCommunityCombosSampleReadjustedCount)
 	workerCount := runtime.NumCPU()
 	results := make(chan oddsRaw, workerCount)
 
 	fmt.Printf("Worker count: %d\n", workerCount)
 
 	for w := 0; w < workerCount; w++ {
-		go calc.showDown(hero, community, availableToCommunity, villainCount, desiredSamplesPerVillain, remainingCommuntiyCombinationsChannel, results)
+		go calc.showDown(hero, community, availableToCommunity, villainCount, desiredSamplesPerVillain,
+			allRemainingCommunityCombinations, remainingCommuntiyCombinationsIndexChannel, results)
 	}
 
-	communityCombinationsSampler(func(remainingCombo combinations.Combination) {
-		remainingCommuntiyCombinationsChannel <- remainingCombo
-	})
+	for index := combinationsSampler.Next(); index > -1; index = combinationsSampler.Next() {
+		remainingCommuntiyCombinationsIndexChannel <- index
+	}
 
-	close(remainingCommuntiyCombinationsChannel)
+	close(remainingCommuntiyCombinationsIndexChannel)
 
 	fmt.Println("closed communtiyCombinationsChannel")
 

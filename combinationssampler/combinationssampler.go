@@ -1,60 +1,68 @@
 package combinationssampler
 
 import (
-	"holdem/combinations"
 	"math/rand"
 	"time"
 )
 
-type CombinationsSamplerCreator struct {
-	//sampleIndexes map[int]struct{}
-	rGen *rand.Rand
+type Sampler struct {
+	sliceLength        int
+	desired            int
+	sampleIndexes      map[int]struct{}
+	rGen               *rand.Rand
+	nextNonRandomIndex int
+	shouldSample       bool
 }
 
-func NewCreator() CombinationsSamplerCreator {
-	return CombinationsSamplerCreator{
-		//sampleIndexes: make(map[int]struct{}),
-		rGen: rand.New(rand.NewSource(time.Now().UnixNano())),
+func NewSampler() Sampler {
+	return Sampler{
+		sampleIndexes: make(map[int]struct{}),
+		rGen:          rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
 var exists = struct{}{}
 
-func (creator *CombinationsSamplerCreator) Create(combos []combinations.Combination, desired int) (func(func(combinations.Combination)), int) {
+func (sampler *Sampler) Setup(sliceLength int, desired int) int {
 
-	combinationsLength := len(combos)
+	sampler.nextNonRandomIndex = 0
+	sampler.sliceLength = sliceLength
+	sampler.desired = desired
+	sampler.shouldSample = sliceLength > desired
 
-	if combinationsLength <= desired {
-
-		return func(action func(combinations.Combination)) {
-			for _, combo := range combos {
-				action(combo)
-			}
-		}, combinationsLength
+	for k := range sampler.sampleIndexes {
+		delete(sampler.sampleIndexes, k)
 	}
 
-	return func(action func(combinations.Combination)) {
+	if sampler.shouldSample {
+		return desired
+	}
+	return sliceLength
+}
 
-		// if len(creator.sampleIndexes) > 0 {
-		// 	panic("combinations sampler creator resused without cleanup (concurrent or recursive use)")
-		// }
+func (sampler *Sampler) Next() int {
 
-		sampleIndexes := make(map[int]struct{})
+	if sampler.shouldSample {
 
-		for len(sampleIndexes) < desired {
+		if len(sampler.sampleIndexes) < sampler.desired {
 
-			randomIndex := creator.rGen.Intn(combinationsLength)
-
-			if _, ok := sampleIndexes[randomIndex]; ok {
-				continue
+			for {
+				randomIndex := sampler.rGen.Intn(sampler.sliceLength)
+				if _, ok := sampler.sampleIndexes[randomIndex]; ok {
+					continue
+				}
+				sampler.sampleIndexes[randomIndex] = exists
+				return randomIndex
 			}
-			sampleIndexes[randomIndex] = exists
-			action(combos[randomIndex])
 		}
 
-		// for selectedIndex := range sampleIndexes {
-		// 	action(combos[selectedIndex])
-		// 	//delete(creator.sampleIndexes, selectedIndex)
-		// }
-	}, desired
+		return -1
+	}
+
+	if sampler.nextNonRandomIndex < sampler.sliceLength {
+		sampler.nextNonRandomIndex += 1
+		return sampler.nextNonRandomIndex - 1
+	} else {
+		return -1
+	}
 }
