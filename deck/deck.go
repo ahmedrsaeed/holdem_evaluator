@@ -6,72 +6,80 @@ import (
 	"strings"
 )
 
+type stringNumberPair struct {
+	str    string
+	number int
+}
+
 type Deck struct {
-	stringToNumber map[string]int
-	numberToString map[int]string
+	stringNumberPair []stringNumberPair
+	stringToNumber   map[string]int
+	numberToString   map[int]string
 }
 
 func New() Deck {
 	deck := Deck{
+		stringToNumber: map[string]int{},
 		numberToString: map[int]string{},
-		stringToNumber: map[string]int{
-			"2c": 1,
-			"2d": 2,
-			"2h": 3,
-			"2s": 4,
-			"3c": 5,
-			"3d": 6,
-			"3h": 7,
-			"3s": 8,
-			"4c": 9,
-			"4d": 10,
-			"4h": 11,
-			"4s": 12,
-			"5c": 13,
-			"5d": 14,
-			"5h": 15,
-			"5s": 16,
-			"6c": 17,
-			"6d": 18,
-			"6h": 19,
-			"6s": 20,
-			"7c": 21,
-			"7d": 22,
-			"7h": 23,
-			"7s": 24,
-			"8c": 25,
-			"8d": 26,
-			"8h": 27,
-			"8s": 28,
-			"9c": 29,
-			"9d": 30,
-			"9h": 31,
-			"9s": 32,
-			"tc": 33,
-			"td": 34,
-			"th": 35,
-			"ts": 36,
-			"jc": 37,
-			"jd": 38,
-			"jh": 39,
-			"js": 40,
-			"qc": 41,
-			"qd": 42,
-			"qh": 43,
-			"qs": 44,
-			"kc": 45,
-			"kd": 46,
-			"kh": 47,
-			"ks": 48,
-			"ac": 49,
-			"ad": 50,
-			"ah": 51,
-			"as": 52,
+		stringNumberPair: []stringNumberPair{
+			{"2c", 1},
+			{"2d", 2},
+			{"2h", 3},
+			{"2s", 4},
+			{"3c", 5},
+			{"3d", 6},
+			{"3h", 7},
+			{"3s", 8},
+			{"4c", 9},
+			{"4d", 10},
+			{"4h", 11},
+			{"4s", 12},
+			{"5c", 13},
+			{"5d", 14},
+			{"5h", 15},
+			{"5s", 16},
+			{"6c", 17},
+			{"6d", 18},
+			{"6h", 19},
+			{"6s", 20},
+			{"7c", 21},
+			{"7d", 22},
+			{"7h", 23},
+			{"7s", 24},
+			{"8c", 25},
+			{"8d", 26},
+			{"8h", 27},
+			{"8s", 28},
+			{"9c", 29},
+			{"9d", 30},
+			{"9h", 31},
+			{"9s", 32},
+			{"tc", 33},
+			{"td", 34},
+			{"th", 35},
+			{"ts", 36},
+			{"jc", 37},
+			{"jd", 38},
+			{"jh", 39},
+			{"js", 40},
+			{"qc", 41},
+			{"qd", 42},
+			{"qh", 43},
+			{"qs", 44},
+			{"kc", 45},
+			{"kd", 46},
+			{"kh", 47},
+			{"ks", 48},
+			{"ac", 49},
+			{"ad", 50},
+			{"ah", 51},
+			{"as", 52},
 		},
 	}
 
-	for key, val := range deck.stringToNumber {
-		deck.numberToString[val] = key
+	for _, pair := range deck.stringNumberPair {
+		deck.numberToString[pair.number] = pair.str
+		deck.stringToNumber[pair.str] = pair.number
 	}
 
 	return deck
@@ -81,7 +89,7 @@ func (d *Deck) SameSuit(c []int) bool {
 
 	lastSuit := ""
 
-	cards, err := d.NumbersToString(c)
+	cards, err := d.CardNumbersToStrings(c)
 
 	if err != nil {
 		return false
@@ -103,23 +111,6 @@ func (d *Deck) SameSuit(c []int) bool {
 	return true
 }
 
-func (d *Deck) Values(c []int) []string {
-
-	cards, err := d.NumbersToString(c)
-
-	if err != nil {
-		return []string{"invalid-card"}
-	}
-
-	out := make([]string, len(c))
-	for i, c := range cards {
-
-		out[i] = c[:1]
-	}
-
-	return out
-}
-
 func (d *Deck) NumberToString(c int) string {
 
 	if s, ok := d.numberToString[c]; ok {
@@ -129,7 +120,7 @@ func (d *Deck) NumberToString(c int) string {
 	return "invalid"
 }
 
-func (d *Deck) NumbersToString(cards []int) ([]string, error) {
+func (d *Deck) CardNumbersToStrings(cards []int) ([]string, error) {
 
 	mapped := make([]string, len(cards))
 
@@ -168,8 +159,9 @@ func (d *Deck) AllNumberValues() []int {
 	}
 
 	result := make([]int, 0, len(d.stringToNumber))
-	for _, v := range d.stringToNumber {
-		result = append(result, v)
+
+	for _, v := range d.stringNumberPair {
+		result = append(result, v.number)
 	}
 
 	return result

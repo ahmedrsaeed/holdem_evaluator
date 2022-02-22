@@ -25,6 +25,7 @@ func New() Combinations {
 func (c *Combinations) intialize() {
 
 	villainCombinations := [][]int{
+		{52, 2},
 		{50, 5},
 		{47, 2},
 		{46, 1},
@@ -119,4 +120,31 @@ func (c *Combinations) Get(n int, r int) ([]Combination, error) {
 	}
 
 	return res, nil
+}
+
+func (c *Combinations) GetAllPossiblePairs(available []int) ([][]int, map[int]map[int]int, error) {
+	combos, err := c.Get(len(available), 2)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pairs := make([][]int, len(combos))
+
+	for i, combo := range combos {
+
+		pairs[i] = list.ValuesAtIndexes(available, combo.Selected)
+	}
+
+	pairsIndexMap := make(map[int]map[int]int)
+
+	for _, a := range available {
+		pairsIndexMap[a] = make(map[int]int)
+	}
+
+	for i, p := range pairs {
+		pairsIndexMap[p[0]][p[1]] = i
+	}
+
+	return pairs, pairsIndexMap, nil
 }
