@@ -1,53 +1,59 @@
-package leftovercardspool
+package battleresult
 
 import "holdem/list"
 
-type LeftOverCards struct {
-	store []int
-	len   int
+type BattleResult struct {
+	leftOverCards      []int
+	leftOverCardsCount int
+	tieCount           int
 }
 
-func (lo *LeftOverCards) Cards() []int {
-	return lo.store[:lo.len]
+func (br *BattleResult) LeftOverCards() []int {
+	return br.leftOverCards[:br.leftOverCardsCount]
+}
+func (br *BattleResult) TieCount() int {
+	return br.tieCount
 }
 
-type LeftOverCardsPool struct {
-	leftOverCardsAvailable []*LeftOverCards
+type BattleResultPool struct {
+	battleResultsAvailable []*BattleResult
 }
 
-func NewLeftOverCardsPool() LeftOverCardsPool {
-	return LeftOverCardsPool{
-		leftOverCardsAvailable: make([]*LeftOverCards, 0),
+func NewBattleResultPool() BattleResultPool {
+	return BattleResultPool{
+		battleResultsAvailable: make([]*BattleResult, 0),
 	}
 }
 
-func (pool *LeftOverCardsPool) ReturnToPool(lo *LeftOverCards) {
-	pool.leftOverCardsAvailable = append(pool.leftOverCardsAvailable, lo)
+func (pool *BattleResultPool) ReturnToPool(lo *BattleResult) {
+	pool.battleResultsAvailable = append(pool.battleResultsAvailable, lo)
 }
 
-func (pool *LeftOverCardsPool) From(src []int, indexes []int) *LeftOverCards {
+func (pool *BattleResultPool) From(src []int, indexes []int, tieCount int) *BattleResult {
 
-	lastCardIndex := len(pool.leftOverCardsAvailable) - 1
+	lastAvailableBattleIndex := len(pool.battleResultsAvailable) - 1
 
-	if lastCardIndex < 0 {
+	if lastAvailableBattleIndex < 0 {
 
-		new := LeftOverCards{
-			store: list.ValuesAtIndexes(src, indexes),
-			len:   len(indexes),
+		new := BattleResult{
+			leftOverCards:      list.ValuesAtIndexes(src, indexes),
+			leftOverCardsCount: len(indexes),
+			tieCount:           tieCount,
 		}
 
 		return &new
 	}
 
-	last := pool.leftOverCardsAvailable[lastCardIndex]
-	pool.leftOverCardsAvailable = pool.leftOverCardsAvailable[:lastCardIndex]
+	last := pool.battleResultsAvailable[lastAvailableBattleIndex]
+	pool.battleResultsAvailable = pool.battleResultsAvailable[:lastAvailableBattleIndex]
 
-	last.len = len(indexes)
+	last.leftOverCardsCount = len(indexes)
+	last.tieCount = tieCount
 
-	if len(last.store) < last.len {
-		last.store = list.ValuesAtIndexes(src, indexes)
+	if len(last.leftOverCards) < last.leftOverCardsCount {
+		last.leftOverCards = list.ValuesAtIndexes(src, indexes)
 	} else {
-		list.CopyValuesAtIndexes(last.store, src, indexes)
+		list.CopyValuesAtIndexes(last.leftOverCards, src, indexes)
 	}
 
 	return last
