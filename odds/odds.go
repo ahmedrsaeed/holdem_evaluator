@@ -182,7 +182,7 @@ func (calc *OddsCalculator) showDown(
 	availableToCommunity []uint8,
 	villainCount int,
 	desiredSamplesPerVillain int,
-	communityCombinations []combinations.Combination,
+	communityCombinations [][]uint8,
 	communityCombinationIndex <-chan int32,
 	results chan<- oddsRaw) {
 
@@ -210,7 +210,7 @@ func (calc *OddsCalculator) showDown(
 
 	for communityComboIndex := range communityCombinationIndex {
 
-		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombinations[communityComboIndex].Selected)
+		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombinations[communityComboIndex])
 		handEvaluator := calc.evaluator.Eval(communityKnown, reusableRemainingCommunity)
 
 		heroResult := handEvaluator(hero)
@@ -225,10 +225,10 @@ func (calc *OddsCalculator) showDown(
 		total := 1
 		previousNonLossResults := append(
 			lossResults[1][:0],
-			battleResultPool.From(availableToCommunity, communityCombinations[communityComboIndex].Other, 0),
+			battleResultPool.From(availableToCommunity, communityCombinations[communityComboIndex], 0),
 		)
 
-		cardsAvailableToVillainCount := uint8(len(communityCombinations[communityComboIndex].Other))
+		cardsAvailableToVillainCount := uint8(len(availableToCommunity) - len(communityCombinations[communityComboIndex]))
 		lastVillainIndex := villainCount - 1
 
 		for vi := 0; vi < villainCount; vi++ {
@@ -248,7 +248,7 @@ func (calc *OddsCalculator) showDown(
 
 				comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
 				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
-					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), allViCombinations[viComboIndex].Selected)
+					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), allViCombinations[viComboIndex])
 					villainResult := handEvaluator(reusableHand)
 
 					// viKey := -1
@@ -292,7 +292,7 @@ func (calc *OddsCalculator) showDown(
 
 					currentNonLossResults = append(
 						currentNonLossResults,
-						battleResultPool.From(prev.LeftOverCards(), allViCombinations[viComboIndex].Other, currentTieCount))
+						battleResultPool.From(prev.LeftOverCards(), allViCombinations[viComboIndex], currentTieCount))
 				}
 
 				battleResultPool.ReturnToPool(prev)

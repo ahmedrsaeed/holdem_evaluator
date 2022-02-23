@@ -1,7 +1,5 @@
 package battleresult
 
-import "holdem/list"
-
 type BattleResult struct {
 	leftOverCards      []uint8
 	leftOverCardsCount int
@@ -29,32 +27,43 @@ func (pool *BattleResultPool) ReturnToPool(lo *BattleResult) {
 	pool.battleResultsAvailable = append(pool.battleResultsAvailable, lo)
 }
 
-func (pool *BattleResultPool) From(src []uint8, indexes []uint8, tieCount int) *BattleResult {
+func (pool *BattleResultPool) From(src []uint8, skipIndexes []uint8, tieCount int) *BattleResult {
 
 	lastAvailableBattleIndex := len(pool.battleResultsAvailable) - 1
 
-	if lastAvailableBattleIndex < 0 {
+	var battleResult *BattleResult
 
-		new := BattleResult{
-			leftOverCards:      list.ValuesAtIndexes(src, indexes),
-			leftOverCardsCount: len(indexes),
-			tieCount:           tieCount,
+	if lastAvailableBattleIndex < 0 {
+		battleResult = &BattleResult{}
+	} else {
+		battleResult = pool.battleResultsAvailable[lastAvailableBattleIndex]
+		pool.battleResultsAvailable = pool.battleResultsAvailable[:lastAvailableBattleIndex]
+	}
+
+	battleResult.leftOverCardsCount = len(src) - len(skipIndexes)
+	battleResult.tieCount = tieCount
+
+	if len(battleResult.leftOverCards) < battleResult.leftOverCardsCount {
+		battleResult.leftOverCards = make([]uint8, battleResult.leftOverCardsCount)
+	}
+
+	var dstStart uint8 = 0
+	var srcStart uint8 = 0
+	for _, skipIndex := range skipIndexes {
+
+		if srcStart == skipIndex {
+			srcStart++
+			continue
 		}
 
-		return &new
+		dstEnd := dstStart + skipIndex - srcStart
+
+		//println(dstStart, dstEnd, srcStart, skipIndex)
+		copy(battleResult.leftOverCards[dstStart:dstEnd], src[srcStart:skipIndex])
+		dstStart = dstEnd
+		srcStart = skipIndex + 1
 	}
+	copy(battleResult.leftOverCards[dstStart:], src[srcStart:])
 
-	last := pool.battleResultsAvailable[lastAvailableBattleIndex]
-	pool.battleResultsAvailable = pool.battleResultsAvailable[:lastAvailableBattleIndex]
-
-	last.leftOverCardsCount = len(indexes)
-	last.tieCount = tieCount
-
-	if len(last.leftOverCards) < last.leftOverCardsCount {
-		last.leftOverCards = list.ValuesAtIndexes(src, indexes)
-	} else {
-		list.CopyValuesAtIndexes(last.leftOverCards, src, indexes)
-	}
-
-	return last
+	return battleResult
 }

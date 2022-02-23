@@ -8,12 +8,7 @@ import (
 )
 
 type Combinations struct {
-	store map[string][]Combination
-}
-
-type Combination struct {
-	Selected []uint8
-	Other    []uint8
+	store map[string][][]uint8
 }
 
 func New() Combinations {
@@ -41,7 +36,7 @@ func (c *Combinations) intialize() {
 		{27, 2},
 	}
 
-	c.store = map[string][]Combination{}
+	c.store = map[string][][]uint8{}
 	for _, e := range villainCombinations {
 
 		t := time.Now()
@@ -54,8 +49,8 @@ func (c *Combinations) intialize() {
 	}
 }
 
-func generate(n uint8, r uint8) (string, []Combination) {
-	combinations := []Combination{}
+func generate(n uint8, r uint8) (string, [][]uint8) {
+	combinations := [][]uint8{}
 
 	allIndexes := make([]uint8, n)
 	for i := range allIndexes {
@@ -63,7 +58,7 @@ func generate(n uint8, r uint8) (string, []Combination) {
 	}
 
 	if (r == 0) || r > n {
-		combinations = append(combinations, Combination{Selected: []uint8{}, Other: allIndexes})
+		combinations = append(combinations, []uint8{})
 		return key(n, r), combinations
 	}
 
@@ -86,12 +81,8 @@ Outer:
 
 		currSelected := list.Clone(current)
 
-		other := list.Filter(allIndexes, func(i uint8) bool {
-			return !list.Includes(currSelected, i)
-		})
-
 		//fmt.Printf("%v\n", current)
-		combinations = append(combinations, Combination{Selected: currSelected, Other: other})
+		combinations = append(combinations, currSelected)
 
 		for {
 
@@ -114,7 +105,7 @@ func key(n uint8, r uint8) string {
 	return fmt.Sprintf("%dc%d", n, r)
 }
 
-func (c *Combinations) Get(n uint8, r uint8) ([]Combination, error) {
+func (c *Combinations) Get(n uint8, r uint8) ([][]uint8, error) {
 
 	res, ok := c.store[key(n, r)]
 
