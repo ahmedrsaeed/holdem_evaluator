@@ -67,25 +67,25 @@ func (e *HandEvaluator) intializeBuffer() error {
 	return nil
 }
 
-func (e *HandEvaluator) fromBuffer(p uint32, hand ...[]uint8) uint32 {
+func (e *HandEvaluator) fromBuffer(p uint32, c uint8) uint32 {
+	start := 4 * (p + uint32(c))
+	return binary.LittleEndian.Uint32(e.buffer[start : start+4])
 
-	for _, subset := range hand {
+}
+
+func (e *HandEvaluator) CreateFrom(partial ...[]uint8) func(uint8, uint8) EvaluatedHand {
+
+	var partialResult uint32 = 53
+	for _, subset := range partial {
 		for _, c := range subset {
-			start := 4 * (p + uint32(c))
-			p = binary.LittleEndian.Uint32(e.buffer[start : start+4])
+			partialResult = e.fromBuffer(partialResult, c)
 		}
 	}
 
-	return p
-}
+	return func(a uint8, b uint8) EvaluatedHand {
 
-func (e *HandEvaluator) Eval(partial ...[]uint8) func([]uint8) EvaluatedHand {
+		finalResult := e.fromBuffer(e.fromBuffer(partialResult, a), b)
 
-	partialResult := e.fromBuffer(uint32(53), partial...)
-
-	return func(rest []uint8) EvaluatedHand {
-
-		finalResult := e.fromBuffer(partialResult, rest)
 		return EvaluatedHand{
 			Value: finalResult,
 			//HandRank: finalP & 0x00000fff,

@@ -6,6 +6,9 @@ type BattleResult struct {
 	tieCount           int
 }
 
+func (br *BattleResult) PairFromLeftOverCards(ia uint8, ib uint8) (uint8, uint8) {
+	return br.leftOverCards[ia], br.leftOverCards[ib]
+}
 func (br *BattleResult) LeftOverCards() []uint8 {
 	return br.leftOverCards[:br.leftOverCardsCount]
 }

@@ -128,7 +128,7 @@ func getHandEvaluator(evaluator handevaluator.HandEvaluator, deck deck.Deck) fun
 			return
 		}
 
-		json.NewEncoder(w).Encode(evaluator.Eval()(hand))
+		json.NewEncoder(w).Encode(evaluator.CreateFrom(hand[:5])(hand[6], hand[7]))
 	}
 }
 
