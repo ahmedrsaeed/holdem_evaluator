@@ -187,7 +187,7 @@ func (calc *OddsCalculator) showDown(
 	results chan<- oddsRaw) {
 
 	//reusables need to be used immediately
-	reusableHand := make([]uint8, 2)
+	//reusableHand := make([]uint8, 2)
 	reusableRemainingCommunity := make([]uint8, remainingCommunityCardsCount(communityKnown))
 	battleResultPool := battleresult.NewBattleResultPool()
 	comboSampler := slicesampler.NewSampler()
@@ -211,9 +211,9 @@ func (calc *OddsCalculator) showDown(
 	for communityComboIndex := range communityCombinationIndex {
 
 		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombinations[communityComboIndex])
-		handEvaluator := calc.evaluator.Eval(communityKnown, reusableRemainingCommunity)
+		handEvaluator := calc.evaluator.CreateFrom(communityKnown, reusableRemainingCommunity)
 
-		heroResult := handEvaluator(hero)
+		heroResult := handEvaluator(hero[0], hero[1])
 
 		if heroResult.HandName == handevaluator.InvalidHand {
 			panic("invalid hand for hero")
@@ -248,8 +248,10 @@ func (calc *OddsCalculator) showDown(
 
 				comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
 				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
-					list.CopyValuesAtIndexes(reusableHand, prev.LeftOverCards(), allViCombinations[viComboIndex])
-					villainResult := handEvaluator(reusableHand)
+					viCardA, viCardB := prev.PairFromLeftOverCards(
+						allViCombinations[viComboIndex][0],
+						allViCombinations[viComboIndex][1])
+					villainResult := handEvaluator(viCardA, viCardB)
 
 					// viKey := -1
 					// if vi == 0 {
