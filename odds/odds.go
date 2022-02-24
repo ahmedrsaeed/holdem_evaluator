@@ -62,7 +62,7 @@ type oddsRaw struct {
 	lose             int
 	tie              int
 	tieVillainCounts map[int]int
-	hero             map[string]int
+	hero             []int
 	// villainHandsFaced    []int
 	// villainHandsLostTo   []int
 	// villainHandsTiedWith []int
@@ -312,9 +312,9 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		// if resultAccumulator.Total%100000 == 0 {
 		// 	fmt.Println(resultAccumulator.Total)
 		// }
-		for _, handType := range handevaluator.HandTypes() {
+		for i, handType := range handevaluator.HandTypes() {
 
-			resultAccumulator.Hero[handType] += r.hero[handType]
+			resultAccumulator.Hero[handType] += r.hero[i]
 		}
 
 		for k, count := range r.tieVillainCounts {

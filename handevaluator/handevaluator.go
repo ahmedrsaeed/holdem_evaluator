@@ -12,15 +12,15 @@ type EvaluatedHand struct {
 }
 
 type HandEvaluator struct {
-	buffer    []byte
-	handTypes []string
+	buffer []byte
+	//handTypes []string
 }
 
-const InvalidHand string = "invalid hand"
+const InvalidHandIndex = 0
 
 func HandTypes() []string {
 	return []string{
-		InvalidHand,
+		"invalid hand",
 		"high card",
 		"one pair",
 		"two pairs",
@@ -35,7 +35,7 @@ func HandTypes() []string {
 
 func New() (HandEvaluator, error) {
 	h := HandEvaluator{}
-	h.handTypes = HandTypes()
+	//h.handTypes = HandTypes()
 	err := h.intializeBuffer()
 
 	if err != nil {
@@ -67,29 +67,34 @@ func (e *HandEvaluator) intializeBuffer() error {
 	return nil
 }
 
-func (e *HandEvaluator) fromBuffer(p uint32, c uint8) uint32 {
+func (e *PartialEvaluation) fromBuffer(p uint32, c uint8) uint32 {
 	start := 4 * (p + uint32(c))
 	return binary.LittleEndian.Uint32(e.buffer[start : start+4])
 
 }
 
-func (e *HandEvaluator) CreateFrom(partial ...[]uint8) func(uint8, uint8) EvaluatedHand {
+func (e *HandEvaluator) PartialEvaluation(partial ...[]uint8) PartialEvaluation {
 
+	partialEvaluation := PartialEvaluation{buffer: e.buffer}
 	var partialResult uint32 = 53
 	for _, subset := range partial {
 		for _, c := range subset {
-			partialResult = e.fromBuffer(partialResult, c)
+			partialResult = partialEvaluation.fromBuffer(partialResult, c)
 		}
 	}
 
-	return func(a uint8, b uint8) EvaluatedHand {
+	partialEvaluation.partial = partialResult
+	return partialEvaluation
+}
 
-		finalResult := e.fromBuffer(e.fromBuffer(partialResult, a), b)
+type PartialEvaluation struct {
+	partial uint32
+	buffer  []byte
+}
 
-		return EvaluatedHand{
-			Value: finalResult,
-			//HandRank: finalP & 0x00000fff,
-			HandName: e.handTypes[finalResult>>12],
-		}
-	}
+func (e *PartialEvaluation) Eval(a uint8, b uint8) (uint32, uint32) {
+
+	finalResult := e.fromBuffer(e.fromBuffer(e.partial, a), b)
+
+	return finalResult, finalResult >> 12
 }

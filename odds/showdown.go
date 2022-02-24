@@ -34,17 +34,17 @@ func (calc *OddsCalculator) showDown(
 		// villainHandsFaced:    make([]int, len(calc.allPossiblePairs)),
 		// villainHandsLostTo:   make([]int, len(calc.allPossiblePairs)),
 		// villainHandsTiedWith: make([]int, len(calc.allPossiblePairs)),
-		hero: map[string]int{},
+		hero: make([]int, len(handevaluator.HandTypes())),
 	}
 
 	for communityComboIndex := range communityCombinationIndex {
 
 		list.CopyValuesAtIndexes(reusableRemainingCommunity, availableToCommunity, communityCombinations[communityComboIndex])
-		handEvaluator := calc.evaluator.CreateFrom(communityKnown, reusableRemainingCommunity)
+		partialEvaluation := calc.evaluator.PartialEvaluation(communityKnown, reusableRemainingCommunity)
 
-		heroResult := handEvaluator(hero[0], hero[1])
+		heroValue, heroHandTypeIndex := partialEvaluation.Eval(hero[0], hero[1])
 
-		if heroResult.HandName == handevaluator.InvalidHand {
+		if heroHandTypeIndex == handevaluator.InvalidHandIndex {
 			panic("invalid hand for hero")
 		}
 
@@ -80,17 +80,17 @@ func (calc *OddsCalculator) showDown(
 
 				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
 					viCardA, viCardB := currAvailableCards[allViCombinations[viComboIndex][0]], currAvailableCards[allViCombinations[viComboIndex][1]]
-					villainResult := handEvaluator(viCardA, viCardB)
+					villainValue, villainHandTypeIndex := partialEvaluation.Eval(viCardA, viCardB)
 
 					currentTieCount := previousTieCount
 					switch {
 
-					case villainResult.HandName == handevaluator.InvalidHand:
+					case villainHandTypeIndex == handevaluator.InvalidHandIndex:
 						panic(fmt.Sprintf("invalid hand for villain %d", vi+1))
-					case villainResult.Value > heroResult.Value:
+					case villainValue > heroValue:
 						showDownsLost++
 						continue
-					case villainResult.Value == heroResult.Value:
+					case villainValue == heroValue:
 						currentTieCount++
 					default:
 					}
@@ -118,7 +118,7 @@ func (calc *OddsCalculator) showDown(
 		rawOdds.win += showDownsWon
 		rawOdds.tie += showDownsTied
 		rawOdds.lose += showDownsLost
-		rawOdds.hero[heroResult.HandName] += total
+		rawOdds.hero[heroHandTypeIndex] += total
 	}
 
 	results <- rawOdds
