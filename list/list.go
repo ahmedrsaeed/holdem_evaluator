@@ -1,5 +1,7 @@
 package list
 
+import "sort"
+
 func Filter(in []uint8, predicate func(uint8) bool) []uint8 {
 
 	out := []uint8{}
@@ -10,6 +12,12 @@ func Filter(in []uint8, predicate func(uint8) bool) []uint8 {
 		}
 	}
 
+	return out
+}
+
+func SortUInt8s(in []uint8) []uint8 {
+	out := Clone(in)
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
 

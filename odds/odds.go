@@ -9,7 +9,6 @@ import (
 	"holdem/slicesampler"
 	"math"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -123,15 +122,9 @@ func (calc *OddsCalculator) hasDuplicates(inputs ...[]uint8) (string, bool) {
 	return "", false
 }
 
-func sortUInt8s(in []uint8) []uint8 {
-	out := list.Clone(in)
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
 func (calc *OddsCalculator) getMemoKey(hero []uint8, community []uint8, villainCount int) string {
 
-	sortedHero := sortUInt8s(hero)
+	sortedHero := list.SortUInt8s(hero)
 	villains := fmt.Sprintf("<-hero|%dvillains|community->", villainCount)
 
 	if len(community) == 0 && len(hero) == 2 {
@@ -147,7 +140,7 @@ func (calc *OddsCalculator) getMemoKey(hero []uint8, community []uint8, villainC
 		return strings.Join(append(heroValues, "different-suit|", villains), "-")
 	}
 
-	communityStrings, err := calc.deck.CardNumbersToStrings(sortUInt8s(community))
+	communityStrings, err := calc.deck.CardNumbersToStrings(list.SortUInt8s(community))
 
 	if err != nil {
 		return err.Error()
