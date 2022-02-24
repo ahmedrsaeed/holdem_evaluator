@@ -1,59 +1,74 @@
 package battleresult
 
+import "fmt"
+
 type BattleResult struct {
-	leftOverCards      []uint8
-	leftOverCardsCount int
-	tieCount           int
+	backingTieCount        []int
+	backingLeftOverCards   []uint8
+	len                    int
+	iterIndex              int
+	leftOverCardsPerBattle int
 }
 
-func (br *BattleResult) PairFromLeftOverCards(ia uint8, ib uint8) (uint8, uint8) {
-	return br.leftOverCards[ia], br.leftOverCards[ib]
-}
-func (br *BattleResult) LeftOverCards() []uint8 {
-	return br.leftOverCards[:br.leftOverCardsCount]
-}
-func (br *BattleResult) TieCount() int {
-	return br.tieCount
-}
-
-type BattleResultPool struct {
-	battleResultsAvailable []*BattleResult
-}
-
-func NewBattleResultPool() BattleResultPool {
-	return BattleResultPool{
-		battleResultsAvailable: make([]*BattleResult, 0),
+func New() BattleResult {
+	return BattleResult{
+		backingLeftOverCards: make([]uint8, 0),
+		backingTieCount:      make([]int, 0),
 	}
 }
 
-func (pool *BattleResultPool) ReturnToPool(lo *BattleResult) {
-	pool.battleResultsAvailable = append(pool.battleResultsAvailable, lo)
+func (br *BattleResult) Reset(leftOverCardsPerBattle int) {
+	br.len = 0
+	br.iterIndex = 0
+	br.leftOverCardsPerBattle = leftOverCardsPerBattle
 }
 
-func (pool *BattleResultPool) From(src []uint8, skipIndexes []uint8, tieCount int) *BattleResult {
+func (br *BattleResult) Next() ([]uint8, int, bool) {
 
-	lastAvailableBattleIndex := len(pool.battleResultsAvailable) - 1
-
-	var battleResult *BattleResult
-
-	if lastAvailableBattleIndex < 0 {
-		battleResult = &BattleResult{}
+	if br.iterIndex < br.len {
+		index := br.iterIndex
+		br.iterIndex++
+		start := br.leftOverCardsPerBattle * index
+		return br.backingLeftOverCards[start : start+br.leftOverCardsPerBattle], br.backingTieCount[index], false
 	} else {
-		battleResult = pool.battleResultsAvailable[lastAvailableBattleIndex]
-		pool.battleResultsAvailable = pool.battleResultsAvailable[:lastAvailableBattleIndex]
+		return nil, 0, true
+	}
+}
+
+func (br *BattleResult) GrowBackingArrays(cardsBeingAdded int) {
+
+	if cardsBeingAdded != br.leftOverCardsPerBattle {
+		panic(fmt.Sprintf("expected %d cards got %d", br.leftOverCardsPerBattle, cardsBeingAdded))
 	}
 
-	battleResult.leftOverCardsCount = len(src) - len(skipIndexes)
-	battleResult.tieCount = tieCount
+	const growthFactor int = 10
 
-	if len(battleResult.leftOverCards) < battleResult.leftOverCardsCount {
-		battleResult.leftOverCards = make([]uint8, battleResult.leftOverCardsCount)
+	if len(br.backingTieCount) < br.len+1 {
+
+		//fmt.Printf("Growing tie count len %d by %d for %d cards\n", len(br.backingTieCount), growthFactor, 1)
+		br.backingTieCount = append(br.backingTieCount, make([]int, growthFactor)...)
 	}
 
-	var dstStart uint8 = 0
-	var srcStart uint8 = 0
-	for _, skipIndex := range skipIndexes {
+	if len(br.backingLeftOverCards) < (br.len+1)*cardsBeingAdded {
 
+		//fmt.Printf("Growing left over cards results len %d by %d for %d cards\n", len(br.backingLeftOverCards), growthFactor, cardsBeingAdded)
+		br.backingLeftOverCards = append(br.backingLeftOverCards, make([]uint8, growthFactor*cardsBeingAdded)...)
+	}
+}
+
+func (br *BattleResult) Add(src []uint8, skipIndexes []uint8, tieCount int) {
+
+	cardsBeingAdded := len(src) - len(skipIndexes)
+
+	br.GrowBackingArrays(cardsBeingAdded)
+
+	br.backingTieCount[br.len] = tieCount
+
+	var dstStart = br.len * cardsBeingAdded
+	var srcStart = 0
+	for i := range skipIndexes {
+
+		skipIndex := int(skipIndexes[i])
 		if srcStart == skipIndex {
 			srcStart++
 			continue
@@ -62,11 +77,10 @@ func (pool *BattleResultPool) From(src []uint8, skipIndexes []uint8, tieCount in
 		dstEnd := dstStart + skipIndex - srcStart
 
 		//println(dstStart, dstEnd, srcStart, skipIndex)
-		copy(battleResult.leftOverCards[dstStart:dstEnd], src[srcStart:skipIndex])
+		copy(br.backingLeftOverCards[dstStart:dstEnd], src[srcStart:skipIndex])
 		dstStart = dstEnd
 		srcStart = skipIndex + 1
 	}
-	copy(battleResult.leftOverCards[dstStart:], src[srcStart:])
-
-	return battleResult
+	copy(br.backingLeftOverCards[dstStart:], src[srcStart:])
+	br.len++
 }
