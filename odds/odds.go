@@ -251,9 +251,9 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 	remainingCommunityCount := uint8(remainingCommunityCardsCount(community))
 	//
 
-	combinationsSampler := slicesampler.NewSampler()
-
 	allRemainingCommunityCombinations, err := calc.combinations.Get(availableToCommunityCount, remainingCommunityCount)
+	allCommunityCombosCount := len(allRemainingCommunityCombinations)
+	combinationsSampler := slicesampler.NewSampler(allCommunityCombosCount)
 
 	if err != nil {
 		return resultAccumulator, err
@@ -261,14 +261,14 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 
 	communityCombosSamplesTargetCount := 300 * 1000
 	totalTestsDesired := float64(communityCombosSamplesTargetCount) * 20000.0
-	actualCommunityCombosSampleCount := combinationsSampler.Reset(len(allRemainingCommunityCombinations), communityCombosSamplesTargetCount)
+	actualCommunityCombosSampleCount := combinationsSampler.Configure(allCommunityCombosCount, communityCombosSamplesTargetCount)
 
 	desiredSamplesPerVillain := int(math.Pow(totalTestsDesired/float64(actualCommunityCombosSampleCount), 1.0/float64(villainCount)))
 	communityCombinationsReadjustedTargetCount := totalTestsDesired / math.Pow(float64(desiredSamplesPerVillain), float64(villainCount))
 	fmt.Printf("%d villains\n", villainCount)
 	fmt.Printf("Desired Samples Per Villain %d\n", desiredSamplesPerVillain)
 
-	actualCommunityCombosSampleReadjustedCount := combinationsSampler.Reset(len(allRemainingCommunityCombinations), int(communityCombinationsReadjustedTargetCount))
+	actualCommunityCombosSampleReadjustedCount := combinationsSampler.Configure(allCommunityCombosCount, int(communityCombinationsReadjustedTargetCount))
 	fmt.Printf("Community combinations count %d\n", actualCommunityCombosSampleReadjustedCount)
 
 	if err != nil {
@@ -285,14 +285,14 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		go calc.showDown(hero, community, availableToCommunity, villainCount, desiredSamplesPerVillain,
 			allRemainingCommunityCombinations, remainingCommuntiyCombinationsIndexChannel, results)
 	}
-
+	combinationsSampler.Reset()
 	for index := combinationsSampler.Next(); index > -1; index = combinationsSampler.Next() {
 		remainingCommuntiyCombinationsIndexChannel <- index
 	}
 
 	close(remainingCommuntiyCombinationsIndexChannel)
 	//combinationsSampler.PrintDuplicateCount("main")
-
+	//combinationsSampler.Print()
 	fmt.Println("closed communtiyCombinationsChannel")
 
 	resultAccumulator.TieVillainCounts = map[int]int{}

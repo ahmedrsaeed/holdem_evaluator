@@ -20,8 +20,18 @@ func (calc *OddsCalculator) showDown(
 
 	//reusables need to be used immediately
 	//reusableHand := make([]uint8, 2)
+
+	cardsAvailableToFirstVillainCount := len(availableToCommunity) - remainingCommunityCardsCount(communityKnown)
+	firstVillainCombinations, err := calc.combinations.Get(uint8(cardsAvailableToFirstVillainCount), 2)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	maxVillainComboCount := len(firstVillainCombinations)
+	comboSampler := slicesampler.NewSampler(maxVillainComboCount)
+
 	reusableRemainingCommunity := make([]uint8, remainingCommunityCardsCount(communityKnown))
-	comboSampler := slicesampler.NewSampler()
 	previousNonLossResults := battleresult.New()
 	currentNonLossResults := battleresult.New()
 
@@ -53,7 +63,7 @@ func (calc *OddsCalculator) showDown(
 		showDownsLost := 0
 		total := 1
 
-		unassignedCardCount := len(availableToCommunity) - len(communityCombinations[communityComboIndex])
+		unassignedCardCount := cardsAvailableToFirstVillainCount
 
 		previousNonLossResults.Reset(unassignedCardCount)
 		previousNonLossResults.Add(availableToCommunity, communityCombinations[communityComboIndex], 0)
@@ -71,12 +81,12 @@ func (calc *OddsCalculator) showDown(
 			unassignedCardCount -= 2
 			currentNonLossResults.Reset(unassignedCardCount)
 
-			actualViSamples := comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
+			actualViSamples := comboSampler.Configure(len(allViCombinations), desiredSamplesPerVillain)
 			total *= actualViSamples
 			showDownsLost *= actualViSamples
 			for currAvailableCards, previousTieCount, done := previousNonLossResults.Next(); !done; currAvailableCards, previousTieCount, done = previousNonLossResults.Next() {
 
-				comboSampler.Reset(len(allViCombinations), desiredSamplesPerVillain)
+				comboSampler.Reset()
 
 				for viComboIndex := comboSampler.Next(); viComboIndex > -1; viComboIndex = comboSampler.Next() {
 					viCardA, viCardB := currAvailableCards[allViCombinations[viComboIndex][0]], currAvailableCards[allViCombinations[viComboIndex][1]]
@@ -120,6 +130,8 @@ func (calc *OddsCalculator) showDown(
 		rawOdds.lose += showDownsLost
 		rawOdds.hero[heroHandTypeIndex] += total
 	}
+
+	//comboSampler.Print()
 
 	results <- rawOdds
 }

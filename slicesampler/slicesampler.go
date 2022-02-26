@@ -1,70 +1,87 @@
 package slicesampler
 
 import (
+	"fmt"
+	"math/bits"
 	"math/rand"
 	"time"
 )
 
+const maxMask uint8 = 1 << 7
+
 type Sampler struct {
+	maxSliceLength     int32
 	sliceLength        int32
-	desired            int
-	sampleIndexes      []bool
-	blank              []bool
+	sampleSize         int
+	sampleIndexMask    uint8
+	sampleIndexes      []uint8
+	blank              []uint8
 	rGen               *rand.Rand
 	nextNonRandomIndex int32
-	shouldSample       bool
+	isSamplingNeeded   bool
+	duplicatesFound    int
 }
 
-func NewSampler() Sampler {
-	return Sampler{
-		blank:         make([]bool, 0),
-		sampleIndexes: make([]bool, 0),
-		rGen:          rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
-}
-
-func (sampler *Sampler) Reset(sliceLength int, desired int) int {
-
-	if sliceLength > 1<<31-1 {
+func NewSampler(maxSliceLength int) Sampler {
+	if maxSliceLength > int(1<<31-1) {
 		panic("can't use Rand.Int31")
 	}
-
-	sampler.nextNonRandomIndex = 0
-	sampler.sliceLength = int32(sliceLength)
-	sampler.shouldSample = sliceLength > desired
-
-	if !sampler.shouldSample {
-		sampler.desired = sliceLength
-		return sliceLength
+	return Sampler{
+		maxSliceLength:  int32(maxSliceLength),
+		sampleIndexMask: 1,
+		blank:           make([]uint8, maxSliceLength),
+		sampleIndexes:   make([]uint8, maxSliceLength),
+		rGen:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-	sampler.desired = desired
+}
+
+func (sampler *Sampler) Configure(sliceLength int, sampleSize int) int {
+	if sliceLength > int(sampler.maxSliceLength) {
+		panic(fmt.Sprintf("%d is greater than max slice length %d", sliceLength, sampler.maxSliceLength))
+	}
+
+	sampler.sliceLength = int32(sliceLength)
+	sampler.isSamplingNeeded = sliceLength > sampleSize
 
 	switch {
-
-	case len(sampler.sampleIndexes) < sliceLength:
-		sampler.sampleIndexes = make([]bool, sliceLength)
-	case len(sampler.blank) < len(sampler.sampleIndexes):
-		sampler.blank = make([]bool, len(sampler.sampleIndexes))
-		fallthrough
+	case sampler.isSamplingNeeded:
+		sampler.sampleSize = sampleSize
 	default:
-		copy(sampler.sampleIndexes, sampler.blank[:sliceLength])
+		sampler.sampleSize = sliceLength
 	}
 
-	return desired
+	sampler.nextNonRandomIndex = int32(sampler.sampleSize) //make it so Next will return done unless Reset is called
+
+	return sampler.sampleSize
+}
+
+func (sampler *Sampler) Reset() {
+
+	sampler.nextNonRandomIndex = 0
+
+	if !sampler.isSamplingNeeded {
+		return
+	}
+
+	if sampler.sampleIndexMask == maxMask {
+		copy(sampler.sampleIndexes, sampler.blank)
+	}
+	sampler.sampleIndexMask = bits.RotateLeft8(sampler.sampleIndexMask, 1)
 }
 
 func (sampler *Sampler) Next() int32 {
 
-	if sampler.nextNonRandomIndex < int32(sampler.desired) {
+	if sampler.nextNonRandomIndex < int32(sampler.sampleSize) {
 		sampler.nextNonRandomIndex += 1
 
-		if sampler.shouldSample {
+		if sampler.isSamplingNeeded {
 			for {
 				randomIndex := sampler.int31n(sampler.sliceLength)
-				if sampler.sampleIndexes[randomIndex] {
+				if sampler.sampleIndexes[randomIndex]&sampler.sampleIndexMask != 0 {
+					//sampler.duplicatesFound++
 					continue
 				}
-				sampler.sampleIndexes[randomIndex] = true
+				sampler.sampleIndexes[randomIndex] |= sampler.sampleIndexMask
 				return randomIndex
 			}
 		}
@@ -72,6 +89,10 @@ func (sampler *Sampler) Next() int32 {
 	} else {
 		return -1
 	}
+}
+
+func (sampler *Sampler) Print() {
+	//fmt.Println("Duplicates found ", sampler.duplicatesFound)
 }
 
 // int31n returns, as an int32, a non-negative pseudo-random number in the half-open interval [0,n).
