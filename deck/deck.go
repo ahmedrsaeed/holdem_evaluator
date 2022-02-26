@@ -126,11 +126,11 @@ func (d *Deck) CardNumbersToStrings(cards []uint8) ([]string, error) {
 
 	for i, n := range cards {
 
-		string, ok := d.numberToString[n]
+		str, ok := d.numberToString[n]
 		if !ok {
 			return nil, fmt.Errorf("%d is not a valid card", n)
 		}
-		mapped[i] = string
+		mapped[i] = str
 	}
 
 	return mapped, nil
@@ -158,10 +158,10 @@ func (d *Deck) AllNumberValues() []uint8 {
 		panic("deck not complete")
 	}
 
-	result := make([]uint8, 0, len(d.stringToNumber))
+	result := make([]uint8, len(d.stringToNumber))
 
-	for _, v := range d.stringNumberPair {
-		result = append(result, v.number)
+	for i, v := range d.stringNumberPair {
+		result[i] = v.number
 	}
 
 	return result
