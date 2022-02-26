@@ -137,7 +137,8 @@ func (sd *showDown) showDownForCommunityComboIndex(communityComboIndex int32) {
 			sd.comboSampler.Reset()
 
 			for viComboIndex := sd.comboSampler.Next(); viComboIndex > -1; viComboIndex = sd.comboSampler.Next() {
-				viCardA, viCardB := currAvailableCards[allViCombinations[viComboIndex][0]], currAvailableCards[allViCombinations[viComboIndex][1]]
+				currentViCombo := allViCombinations[viComboIndex]
+				viCardA, viCardB := currAvailableCards[currentViCombo[0]], currAvailableCards[currentViCombo[1]]
 				villainValue, villainHandTypeIndex := partialEvaluation.Eval(viCardA, viCardB)
 
 				currentTieCount := previousTieCount
@@ -166,7 +167,7 @@ func (sd *showDown) showDownForCommunityComboIndex(communityComboIndex int32) {
 
 				//println("I should not be reached for one villain")
 
-				sd.currentNonLossResults.Add(currAvailableCards, allViCombinations[viComboIndex], currentTieCount)
+				sd.currentNonLossResults.Add(currAvailableCards, currentViCombo, currentTieCount)
 			}
 		}
 		sd.previousNonLossResults, sd.currentNonLossResults = sd.currentNonLossResults, sd.previousNonLossResults
