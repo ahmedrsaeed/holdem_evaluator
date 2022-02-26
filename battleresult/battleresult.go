@@ -35,7 +35,7 @@ func (br *BattleResult) Next() ([]uint8, int, bool) {
 	}
 }
 
-func (br *BattleResult) GrowBackingArrays(cardsBeingAdded int) {
+func (br *BattleResult) growBackingArrays(cardsBeingAdded int) {
 
 	if cardsBeingAdded != br.leftOverCardsPerBattle {
 		panic(fmt.Sprintf("expected %d cards got %d", br.leftOverCardsPerBattle, cardsBeingAdded))
@@ -60,7 +60,7 @@ func (br *BattleResult) Add(src []uint8, skipIndexes []uint8, tieCount int) {
 
 	cardsBeingAdded := len(src) - len(skipIndexes)
 
-	br.GrowBackingArrays(cardsBeingAdded)
+	br.growBackingArrays(cardsBeingAdded)
 
 	br.backingTieCount[br.len] = tieCount
 
