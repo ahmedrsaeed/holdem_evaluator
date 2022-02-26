@@ -1,14 +1,13 @@
 package combinations
 
 import (
-	"errors"
 	"fmt"
 	"holdem/list"
 	"time"
 )
 
 type Combinations struct {
-	store map[string][][]uint8
+	store map[uint16][][]uint8
 }
 
 func New() Combinations {
@@ -36,7 +35,7 @@ func (c *Combinations) intialize() {
 		{27, 2},
 	}
 
-	c.store = map[string][][]uint8{}
+	c.store = map[uint16][][]uint8{}
 	for _, e := range villainCombinations {
 
 		t := time.Now()
@@ -49,7 +48,7 @@ func (c *Combinations) intialize() {
 	}
 }
 
-func generate(n uint8, r uint8) (string, [][]uint8) {
+func generate(n uint8, r uint8) (uint16, [][]uint8) {
 	combinations := [][]uint8{}
 
 	allIndexes := make([]uint8, n)
@@ -101,8 +100,8 @@ Outer:
 	return key(n, r), combinations
 }
 
-func key(n uint8, r uint8) string {
-	return fmt.Sprintf("%dc%d", n, r)
+func key(n uint8, r uint8) uint16 {
+	return uint16(r) | uint16(n)<<8
 }
 
 func (c *Combinations) Get(n uint8, r uint8) ([][]uint8, error) {
@@ -110,7 +109,7 @@ func (c *Combinations) Get(n uint8, r uint8) ([][]uint8, error) {
 	res, ok := c.store[key(n, r)]
 
 	if !ok {
-		return nil, errors.New("unable to compute " + key(n, r))
+		return nil, fmt.Errorf("unable to compute %d c %d", n, r)
 	}
 
 	return res, nil
