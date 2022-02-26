@@ -56,18 +56,6 @@ type Odds struct {
 	// HandComparisions []HandComparision
 }
 
-type oddsRaw struct {
-	total            int
-	win              int
-	lose             int
-	tie              int
-	tieVillainCounts map[int]int
-	hero             []int
-	// villainHandsFaced    []int
-	// villainHandsLostTo   []int
-	// villainHandsTiedWith []int
-}
-
 func NewCalculator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations, deck deck.Deck) OddsCalculator {
 
 	// allPossibleNumberPairs, allPossiblePairsIndexMap, err := combinations.GetAllPossiblePairs(deck.AllNumberValues())
@@ -277,7 +265,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 
 	remainingCommuntiyCombinationsIndexChannel := make(chan int32, actualCommunityCombosSampleReadjustedCount)
 	workerCount := runtime.NumCPU()
-	results := make(chan oddsRaw, workerCount)
+	results := make(chan showDownResults, workerCount)
 
 	fmt.Printf("Worker count: %d\n", workerCount)
 
