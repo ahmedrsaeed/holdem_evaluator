@@ -113,7 +113,7 @@ func (sd *showDown) showDownForCommunityComboIndex(communityComboIndex int32) {
 
 	unassignedCardCount := sd.cardsAvailableToFirstVillainCount
 
-	sd.previousNonLossResults.Reset(unassignedCardCount)
+	sd.previousNonLossResults.Configure(unassignedCardCount)
 	sd.previousNonLossResults.Add(sd.availableToCommunity, sd.communityCombinations[communityComboIndex], 0)
 
 	lastVillainIndex := sd.villainCount - 1
@@ -127,14 +127,12 @@ func (sd *showDown) showDownForCommunityComboIndex(communityComboIndex int32) {
 		}
 
 		unassignedCardCount -= 2
-		sd.currentNonLossResults.Reset(unassignedCardCount)
+		sd.currentNonLossResults.Configure(unassignedCardCount)
 
 		actualViSamples := sd.comboSampler.Configure(len(allViCombinations), sd.desiredSamplesPerVillain)
 		total *= actualViSamples
 		showDownsLost *= actualViSamples
 		for currAvailableCards, previousTieCount, done := sd.previousNonLossResults.Next(); !done; currAvailableCards, previousTieCount, done = sd.previousNonLossResults.Next() {
-
-			sd.comboSampler.Reset()
 
 			for viComboIndex := sd.comboSampler.Next(); viComboIndex > -1; viComboIndex = sd.comboSampler.Next() {
 				currentViCombo := allViCombinations[viComboIndex]

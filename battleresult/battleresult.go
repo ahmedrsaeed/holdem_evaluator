@@ -17,7 +17,7 @@ func New() BattleResult {
 	}
 }
 
-func (br *BattleResult) Reset(leftOverCardsPerBattle int) {
+func (br *BattleResult) Configure(leftOverCardsPerBattle int) {
 	br.len = 0
 	br.iterIndex = 0
 	br.leftOverCardsPerBattle = leftOverCardsPerBattle

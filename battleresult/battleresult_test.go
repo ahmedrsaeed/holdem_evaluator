@@ -24,7 +24,7 @@ func BenchmarkAdd(b *testing.B) {
 	skipIndexes := []uint8{1, 5}
 	b.ResetTimer()
 	for t := 0; t < b.N; t++ {
-		x.Reset(17)
+		x.Configure(17)
 
 		for n := 0; n < 7000; n++ {
 			x.Add(available, skipIndexes, n)

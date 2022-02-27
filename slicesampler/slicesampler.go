@@ -19,7 +19,7 @@ type Sampler struct {
 	rGen               *rand.Rand
 	nextNonRandomIndex int32
 	isSamplingNeeded   bool
-	duplicatesFound    int
+	//duplicatesFound    int
 }
 
 func NewSampler(maxSliceLength int) Sampler {
@@ -50,12 +50,12 @@ func (sampler *Sampler) Configure(sliceLength int, sampleSize int) int {
 		sampler.sampleSize = sliceLength
 	}
 
-	sampler.nextNonRandomIndex = int32(sampler.sampleSize) //make it so Next will return done unless Reset is called
+	//sampler.nextNonRandomIndex = int32(sampler.sampleSize) //make it so Next will return done unless Reset is called
 
 	return sampler.sampleSize
 }
 
-func (sampler *Sampler) Reset() {
+func (sampler *Sampler) reset() {
 
 	sampler.nextNonRandomIndex = 0
 
@@ -87,6 +87,7 @@ func (sampler *Sampler) Next() int32 {
 		}
 		return sampler.nextNonRandomIndex - 1
 	} else {
+		sampler.reset()
 		return -1
 	}
 }

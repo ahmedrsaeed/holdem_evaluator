@@ -58,28 +58,6 @@ type Odds struct {
 
 func NewCalculator(evaluator handevaluator.HandEvaluator, combinations combinations.Combinations, deck deck.Deck) OddsCalculator {
 
-	// allPossibleNumberPairs, allPossiblePairsIndexMap, err := combinations.GetAllPossiblePairs(deck.AllNumberValues())
-
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// allPossibleStringPairs := make([][]string, len(allPossibleNumberPairs))
-
-	// for i, nPair := range allPossibleNumberPairs {
-
-	// 	res, err := deck.CardNumbersToStrings(nPair)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	allPossibleStringPairs[i] = res
-	// }
-
-	// for i, x := range allPossibleNumberPairs {
-
-	// 	fmt.Printf("%d %v %d %v\n", i, x, allPossiblePairsIndexMap[x[0]][x[1]], allPossibleStringPairs[i])
-	// }
-
 	c := OddsCalculator{
 		evaluator:    evaluator,
 		combinations: combinations,
@@ -247,7 +225,7 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		return resultAccumulator, err
 	}
 
-	communityCombosSamplesTargetCount := 300 * 1000
+	communityCombosSamplesTargetCount := 100 * 1000
 	totalTestsDesired := float64(communityCombosSamplesTargetCount) * 20000.0
 	actualCommunityCombosSampleCount := combinationsSampler.Configure(allCommunityCombosCount, communityCombosSamplesTargetCount)
 
@@ -273,7 +251,6 @@ func (calc *OddsCalculator) Calculate(heroStrings []string, communityStrings []s
 		go calc.showDown(hero, community, availableToCommunity, villainCount, desiredSamplesPerVillain,
 			allRemainingCommunityCombinations, remainingCommuntiyCombinationsIndexChannel, results)
 	}
-	combinationsSampler.Reset()
 	for index := combinationsSampler.Next(); index > -1; index = combinationsSampler.Next() {
 		remainingCommuntiyCombinationsIndexChannel <- index
 	}
