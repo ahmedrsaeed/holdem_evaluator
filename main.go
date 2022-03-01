@@ -129,7 +129,7 @@ func getHandEvaluator(evaluator handevaluator.HandEvaluator, deck deck.Deck) fun
 		}
 
 		partialEvaluation := evaluator.PartialEvaluation(hand[:5])
-		value, handTypeIndex := partialEvaluation.Eval(hand[6], hand[7])
+		value, handTypeIndex := partialEvaluation.Eval(hand[5], hand[6])
 
 		json.NewEncoder(w).Encode(handevaluator.EvaluatedHand{
 			Value:    value,
