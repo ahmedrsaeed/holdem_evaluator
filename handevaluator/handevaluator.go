@@ -12,7 +12,7 @@ type EvaluatedHand struct {
 }
 
 type HandEvaluator struct {
-	buffer []byte
+	ranks []uint32
 	//handTypes []string
 }
 
@@ -58,24 +58,28 @@ func (e *HandEvaluator) intializeBuffer() error {
 	}
 
 	filesize := fileinfo.Size()
-	e.buffer = make([]byte, filesize)
+	buffer := make([]byte, filesize)
+	e.ranks = make([]uint32, filesize/4)
 
-	_, err = file.Read(e.buffer)
+	_, err = file.Read(buffer)
 	if err != nil {
 		return err
+	}
+
+	for i := 0; i < int(filesize); i += 4 {
+		e.ranks[i/4] = binary.LittleEndian.Uint32(buffer[i:])
 	}
 	return nil
 }
 
 func (e *PartialEvaluation) fromBuffer(p uint32, c uint8) uint32 {
-	start := 4 * (p + uint32(c))
-	return binary.LittleEndian.Uint32(e.buffer[start : start+4])
+	return e.ranks[p+uint32(c)]
 
 }
 
 func (e *HandEvaluator) PartialEvaluation(partial ...[]uint8) PartialEvaluation {
 
-	partialEvaluation := PartialEvaluation{buffer: e.buffer}
+	partialEvaluation := PartialEvaluation{ranks: e.ranks}
 	var partialResult uint32 = 53
 	for _, subset := range partial {
 		for _, c := range subset {
@@ -89,7 +93,7 @@ func (e *HandEvaluator) PartialEvaluation(partial ...[]uint8) PartialEvaluation 
 
 type PartialEvaluation struct {
 	partial uint32
-	buffer  []byte
+	ranks   []uint32
 }
 
 func (e *PartialEvaluation) Eval(a uint8, b uint8) (uint32, uint32) {
