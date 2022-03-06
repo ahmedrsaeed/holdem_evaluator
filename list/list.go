@@ -37,6 +37,28 @@ func CopyValuesAtIndexes(dst []uint8, src []uint8, indexes []uint8) {
 	}
 }
 
+func CopyValuesNotAtIndexes(dst []uint8, src []uint8, skipIndexes []uint8) {
+
+	var dstStart = 0
+	var srcStart = 0
+	for i := range skipIndexes {
+
+		skipIndex := int(skipIndexes[i])
+		if srcStart == skipIndex {
+			srcStart++
+			continue
+		}
+
+		dstEnd := dstStart + skipIndex - srcStart
+
+		//println(dstStart, dstEnd, srcStart, skipIndex)
+		copy(dst[dstStart:dstEnd], src[srcStart:skipIndex])
+		dstStart = dstEnd
+		srcStart = skipIndex + 1
+	}
+	copy(dst[dstStart:], src[srcStart:])
+}
+
 func Clone(in []uint8) []uint8 {
 	out := make([]uint8, len(in))
 	copy(out, in)

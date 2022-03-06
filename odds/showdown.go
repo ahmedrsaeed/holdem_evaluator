@@ -2,7 +2,6 @@ package odds
 
 import (
 	"fmt"
-	"holdem/battleresult"
 	"holdem/combinations"
 	"holdem/handevaluator"
 	"holdem/list"
@@ -21,24 +20,28 @@ type showDownResults struct {
 	// villainHandsTiedWith []int
 }
 
+type villain struct {
+	cardsAvailable []uint8
+	combinations   [][]uint8
+	sampler        slicesampler.Sampler
+	sampleSize     int
+	lossMultiplier int
+	tieCount       int
+}
+
 type showDown struct {
-	hero                              []uint8
-	communityKnown                    []uint8
-	availableToCommunity              []uint8
-	villainCount                      int
-	desiredSamplesPerVillain          int
-	communityCombinations             [][]uint8
-	communityCombinationIndex         <-chan int32
-	results                           chan<- showDownResults
-	evaluator                         handevaluator.HandEvaluator
-	combinations                      combinations.Combinations
-	cardsAvailableToFirstVillainCount int
-	maxVillainComboCount              int
-	reusableRemainingCommunity        []uint8
-	previousNonLossResults            battleresult.BattleResult
-	currentNonLossResults             battleresult.BattleResult
-	comboSampler                      slicesampler.Sampler
-	cumulativeResults                 showDownResults
+	hero                       []uint8
+	communityKnown             []uint8
+	availableToCommunity       []uint8
+	communityCombinations      [][]uint8
+	communityCombinationIndex  <-chan int32
+	results                    chan<- showDownResults
+	evaluator                  handevaluator.HandEvaluator
+	combinations               combinations.Combinations
+	reusableRemainingCommunity []uint8
+	cumulativeResults          showDownResults
+	villains                   []villain
+	totalPerCombo              int
 }
 
 func (calc *OddsCalculator) showDown(
@@ -52,41 +55,48 @@ func (calc *OddsCalculator) showDown(
 	results chan<- showDownResults) {
 
 	showDown := showDown{
-		hero:                              hero,
-		communityKnown:                    communityKnown,
-		availableToCommunity:              availableToCommunity,
-		villainCount:                      villainCount,
-		desiredSamplesPerVillain:          desiredSamplesPerVillain,
-		communityCombinations:             communityCombinations,
-		communityCombinationIndex:         communityCombinationIndex,
-		results:                           results,
-		evaluator:                         calc.evaluator,
-		combinations:                      calc.combinations,
-		cardsAvailableToFirstVillainCount: len(availableToCommunity) - remainingCommunityCardsCount(communityKnown),
-		reusableRemainingCommunity:        make([]uint8, remainingCommunityCardsCount(communityKnown)),
-		previousNonLossResults:            battleresult.New(),
-		currentNonLossResults:             battleresult.New(),
+		hero:                       hero,
+		communityKnown:             communityKnown,
+		availableToCommunity:       availableToCommunity,
+		communityCombinations:      communityCombinations,
+		communityCombinationIndex:  communityCombinationIndex,
+		results:                    results,
+		evaluator:                  calc.evaluator,
+		combinations:               calc.combinations,
+		reusableRemainingCommunity: make([]uint8, remainingCommunityCardsCount(communityKnown)),
+		villains:                   make([]villain, villainCount),
 		cumulativeResults: showDownResults{
 			total:            0,
 			win:              0,
 			tie:              0,
 			lose:             0,
 			tieVillainCounts: map[int]int{},
-			// villainHandsFaced:    make([]int, len(calc.allPossiblePairs)),
-			// villainHandsLostTo:   make([]int, len(calc.allPossiblePairs)),
-			// villainHandsTiedWith: make([]int, len(calc.allPossiblePairs)),
-			hero: make([]int, len(handevaluator.HandTypes())),
+			hero:             make([]int, len(handevaluator.HandTypes())),
 		},
 	}
 
-	firstVillainCombinations, err := calc.combinations.Get(uint8(showDown.cardsAvailableToFirstVillainCount), 2)
+	cardsAvailableToVillain := len(availableToCommunity) - remainingCommunityCardsCount(communityKnown)
+	showDown.totalPerCombo = 1
 
-	if err != nil {
-		panic(err.Error())
+	for i := range showDown.villains {
+		combinations, err := calc.combinations.Get(uint8(cardsAvailableToVillain), 2)
+		showDown.villains[i].cardsAvailable = make([]uint8, cardsAvailableToVillain)
+		cardsAvailableToVillain -= 2
+
+		if err != nil {
+			panic(err.Error())
+		}
+		showDown.villains[i].combinations = combinations
+		showDown.villains[i].sampler = slicesampler.NewSampler(len(combinations))
+		showDown.villains[i].sampleSize = showDown.villains[i].sampler.Configure(len(combinations), desiredSamplesPerVillain)
+		showDown.totalPerCombo *= showDown.villains[i].sampleSize
 	}
 
-	showDown.maxVillainComboCount = len(firstVillainCombinations)
-	showDown.comboSampler = slicesampler.NewSampler(showDown.maxVillainComboCount)
+	lossMultiplier := showDown.totalPerCombo
+	for i := 0; i < villainCount; i++ {
+		lossMultiplier /= showDown.villains[i].sampleSize
+		showDown.villains[i].lossMultiplier = lossMultiplier
+	}
 
 	for communityComboIndex := range communityCombinationIndex {
 		showDown.showDownForCommunityComboIndex(communityComboIndex)
@@ -109,71 +119,50 @@ func (sd *showDown) showDownForCommunityComboIndex(communityComboIndex int32) {
 	showDownsWon := 0
 	showDownsTied := 0
 	showDownsLost := 0
-	total := 1
 
-	unassignedCardCount := sd.cardsAvailableToFirstVillainCount
+	list.CopyValuesNotAtIndexes(sd.villains[0].cardsAvailable, sd.availableToCommunity, sd.communityCombinations[communityComboIndex])
+	lastVillainIndex := len(sd.villains) - 1
 
-	sd.previousNonLossResults.Configure(unassignedCardCount)
-	sd.previousNonLossResults.Add(sd.availableToCommunity, sd.communityCombinations[communityComboIndex], 0)
+	for vi := 0; vi > -1; vi-- {
 
-	lastVillainIndex := sd.villainCount - 1
+		for viComboIndex := sd.villains[vi].sampler.Next(); viComboIndex > -1; viComboIndex = sd.villains[vi].sampler.Next() {
+			currentViCombo := sd.villains[vi].combinations[viComboIndex]
+			viCardA, viCardB := sd.villains[vi].cardsAvailable[currentViCombo[0]], sd.villains[vi].cardsAvailable[currentViCombo[1]]
+			villainValue, villainHandTypeIndex := partialEvaluation.Eval(viCardA, viCardB)
 
-	for vi := 0; vi < sd.villainCount; vi++ {
+			currentTieCount := sd.villains[vi].tieCount
+			switch {
 
-		allViCombinations, err := sd.combinations.Get(uint8(unassignedCardCount), 2)
-
-		if err != nil {
-			panic(err.Error())
-		}
-
-		unassignedCardCount -= 2
-		sd.currentNonLossResults.Configure(unassignedCardCount)
-
-		actualViSamples := sd.comboSampler.Configure(len(allViCombinations), sd.desiredSamplesPerVillain)
-		total *= actualViSamples
-		showDownsLost *= actualViSamples
-		for currAvailableCards, previousTieCount, done := sd.previousNonLossResults.Next(); !done; currAvailableCards, previousTieCount, done = sd.previousNonLossResults.Next() {
-
-			for viComboIndex := sd.comboSampler.Next(); viComboIndex > -1; viComboIndex = sd.comboSampler.Next() {
-				currentViCombo := allViCombinations[viComboIndex]
-				viCardA, viCardB := currAvailableCards[currentViCombo[0]], currAvailableCards[currentViCombo[1]]
-				villainValue, villainHandTypeIndex := partialEvaluation.Eval(viCardA, viCardB)
-
-				currentTieCount := previousTieCount
-				switch {
-
-				case villainHandTypeIndex == handevaluator.InvalidHandIndex:
-					panic(fmt.Sprintf("invalid hand for villain %d", vi+1))
-				case villainValue > heroValue:
-					showDownsLost++
-					continue
-				case villainValue == heroValue:
-					currentTieCount++
-				default:
-				}
-
-				if vi == lastVillainIndex {
-
-					if currentTieCount == 0 {
-						showDownsWon++
-					} else {
-						showDownsTied++
-						sd.cumulativeResults.tieVillainCounts[currentTieCount] += 1
-					}
-					continue
-				}
-
-				//println("I should not be reached for one villain")
-
-				sd.currentNonLossResults.Add(currAvailableCards, currentViCombo, currentTieCount)
+			case villainHandTypeIndex == handevaluator.InvalidHandIndex:
+				panic(fmt.Sprintf("invalid hand for villain %d", vi+1))
+			case villainValue > heroValue:
+				showDownsLost += sd.villains[vi].lossMultiplier
+				continue
+			case villainValue == heroValue:
+				currentTieCount++
+			default:
 			}
+
+			if vi == lastVillainIndex {
+
+				if currentTieCount == 0 {
+					showDownsWon++
+				} else {
+					showDownsTied++
+					sd.cumulativeResults.tieVillainCounts[currentTieCount] += 1
+				}
+				continue
+			}
+			vi += 1
+			list.CopyValuesNotAtIndexes(sd.villains[vi].cardsAvailable, sd.villains[vi-1].cardsAvailable, currentViCombo)
+			sd.villains[vi].tieCount = currentTieCount
 		}
-		sd.previousNonLossResults, sd.currentNonLossResults = sd.currentNonLossResults, sd.previousNonLossResults
+
 	}
 
-	sd.cumulativeResults.total += total
+	sd.cumulativeResults.total += sd.totalPerCombo
 	sd.cumulativeResults.win += showDownsWon
 	sd.cumulativeResults.tie += showDownsTied
 	sd.cumulativeResults.lose += showDownsLost
-	sd.cumulativeResults.hero[heroHandTypeIndex] += total
+	sd.cumulativeResults.hero[heroHandTypeIndex] += sd.totalPerCombo
 }
