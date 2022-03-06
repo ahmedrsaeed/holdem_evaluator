@@ -41,18 +41,18 @@ func (br *BattleResult) growBackingArrays(cardsBeingAdded int) {
 		panic(fmt.Sprintf("expected %d cards got %d", br.leftOverCardsPerBattle, cardsBeingAdded))
 	}
 
-	const growthFactor int = 10
-
-	if len(br.backingTieCount) < br.len+1 {
+	lenBackingTieCount := len(br.backingTieCount)
+	if lenBackingTieCount < br.len+1 {
 
 		//fmt.Printf("Growing tie count len %d by %d for %d cards\n", len(br.backingTieCount), growthFactor, 1)
-		br.backingTieCount = append(br.backingTieCount, make([]int, growthFactor)...)
+		br.backingTieCount = append(br.backingTieCount, make([]int, lenBackingTieCount+1)...)
 	}
 
+	lenBackingLeftOverCards := len(br.backingLeftOverCards)
 	if len(br.backingLeftOverCards) < (br.len+1)*cardsBeingAdded {
 
 		//fmt.Printf("Growing left over cards results len %d by %d for %d cards\n", len(br.backingLeftOverCards), growthFactor, cardsBeingAdded)
-		br.backingLeftOverCards = append(br.backingLeftOverCards, make([]uint8, growthFactor*cardsBeingAdded)...)
+		br.backingLeftOverCards = append(br.backingLeftOverCards, make([]uint8, lenBackingLeftOverCards+cardsBeingAdded)...)
 	}
 }
 
